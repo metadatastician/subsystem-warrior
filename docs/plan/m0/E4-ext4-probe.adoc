@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= E4 — Read-only ext4 probe in Zig
+:toc:
+
+[cols="1,4"]
+|===
+| Status | planned
+| Depends on | E1, E2; shares the Atoma pin and the `m0` build step with E3
+| Feeds | W3 (version-skew refusal) in M1; M1 rescue walker; `zig-ext4-ro` idea; rescue-distro choice
+| Rulings | P6 (extend with a bounded directory walk)
+|===
+
+== Goal
+
+Read an ext4 filesystem from a raw image, read-only, and report:
+
+* the superblock and its CRC-32C;
+* feature flags (compat / incompat / ro_compat), by name and by bit;
+* group descriptors and their checksums;
+* *(added by ruling P6)* a bounded walk of inodes, extent trees and directory
+  blocks, verifying the htree (dx_root / dx_node) checksums.
+
+The walk is extra scope. The brief's E4 acceptance requires every ext4 fault
+in E1 to be detected, including `F-HTREE`, which superblock and descriptor
+checks alone cannot see.
+
+== Before any code
+
+* Pin the reference: the kernel's `Documentation/filesystems/ext4/` at a named
+  kernel tag, plus the e2fsprogs source at the pinned version. Struct offsets
+  in code cite that tag.
+* Build the *feature table*: every feature bit, with its name as `dumpe2fs`
+  prints it, and the first e2fsprogs version that supports it. W3 in M1 is a
+  lookup in this table. Its sources are recorded in the receipt.
+
+== Shape
+
+* `verified/ext4/`: superblock, features, group descriptors, inode, extent
+  and directory-block parsers over slices. The extent tree (depth ≤ 5) is a
+  *bounded loop* with `@invariant` / `@decreases`, never recursion (brief
+  §Atoma). The directory walk is a work-list with an explicit bound (inode
+  count), not recursion.
+* `shell/ext4_probe.zig` reads blocks on demand and emits an I-JSON/JCS
+  report.
+* The primary superblock failing does *not* end the probe. It reports
+  `F-SB-PRIMARY`, then locates a backup (group 1 under `sparse_super`) and
+  continues. This is detection only, never repair.
+
+== Acceptance (exit status decides)
+
+`just e4` exits 0 iff all of the following hold:
+
+. Every `F-*` fixture: the probe names exactly the declared fault.
+. `X-CLEAN`, `K-WSLCONF-BAD` and every `C-*` fixture (on the raw image from
+  qemu, for the ones qemu can read): the probe reports no filesystem fault.
+. On every fixture whose superblock is readable, the probe's feature list
+  equals the "Filesystem features" line of `dumpe2fs -h` at the pinned
+  e2fsprogs, compared as sets of names. Unknown bits are compared in
+  dumpe2fs's own `FEATURE_<x><n>` spelling.
+. `F-FEATURE-UNKNOWN` is reported as an *unknown* feature, and the report
+  says that a write would be refused (the W3 rule, exercised read-only).
+. The Atoma check passes on `verified/ext4/` at the pinned commit.
+
+== Falsifiers
+
+* Passing on a fixture after its checksum is deliberately broken (brief).
+  Concretely: copy each clean fixture, flip one byte inside the superblock,
+  inside one group descriptor and inside one dx block, recompute nothing, and
+  the probe must go red on each.
+* A feature-set mismatch with `dumpe2fs -h` on any fixture.
+
+== Mutations — watch it go red
+
+* Skip the superblock checksum: the falsifier above must fail.
+* Cap the extent loop one level short: a multi-level extent file in the
+  payload must then be reported unreadable.
+* Map one feature bit to the wrong name: the `dumpe2fs` comparison must fail.
+
+== Out of scope
+
+Writing, journal replay, orphan processing, and any repair. Those belong to
+e2fsck in the rescue distro (M1).
+
+== Risks and unknowns
+
+* `metadata_csum` vs. the older `gdt_csum` (CRC16) for group descriptors: the
+  payload is built with `metadata_csum`. A legacy-checksum fixture is a
+  possible follow-up, not M0.
+* Inline data and encrypted directories in the walk: report them as
+  "not walked" (W7), not as clean.
+
+== Aspects
+
+* *Safety (W3):* the feature table is the single source the M1 write gate
+  reads. Keep it data (`src/errors/` or `src/definitions/`), not code.
+* *Privacy (W5):* the probe reports structure, names and hashes, never file
+  contents.
+* *Proof trajectory:* a bounded walk with explicit invariants is the natural
+  object for a later Idris2-side totality argument in M1's state machine.
+
+== Beyond this repo
+
+* `zig-ext4-ro`: candidate standalone read-only ext4 package (`verified/ext4`).
+* The feature table (bit → name → first e2fsprogs version) is useful to any
+  estate tool that touches ext4. It may belong in `standards` as data.
+
+== Receipt
+
+`verification/tests/m0/E4-receipt.adoc` and `.json`.

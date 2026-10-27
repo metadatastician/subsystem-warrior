@@ -1,0 +1,193 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= subsystem-warrior — WSL backend handoff
+:subtitle: Brief for a coding agent · revision 1 · 2026-10-27
+:toc:
+:sectnums:
+
+[abstract]
+--
+This file carries the decisions and plan from a design conversation that the
+implementing agent did not see. It is the only context you have. Read it fully
+before changing anything, then read `CLAUDE.md` and follow its arrival order.
+Where this brief and the estate canon disagree, the canon wins; report the
+conflict rather than resolving it silently.
+--
+
+== What is being built
+
+*subsystem-warrior* is an open-source recovery tool in the spirit of DiskWarrior,
+for "guest-disk subsystems": systems where a Linux filesystem lives inside a
+virtual disk managed by a host OS. It is a generic tool with backends. *WSL is the
+first backend.* Later candidates (not now): Docker Desktop / Rancher Desktop /
+Podman machine disks, Lima/Colima, ChromeOS Crostini.
+
+=== Decisions already made by the owner
+
+[cols="1,3", options="header"]
+|===
+| Decision | Value
+
+| Shape | Generic umbrella; a layered model shared by all backends; WSL is backend 1
+| Milestone 1 scope | Full repair (diagnose, rescue, *and* gated writes)
+| Runtime | A Windows executable for host-side layers, which imports and drives its own minimal rescue WSL distro for filesystem work
+| Languages | Idris2 for the API, state machine and contracts; pure Zig for FFI, I/O and binary parsing (estate policy)
+| Verification | Binary-format parsers are written to the Atoma verifiable Zig subset (`hyperpolymath/atoma`) — see §6
+| Repo | `metadatastician/subsystem-warrior`, minted from `rsr-template-repo`
+|===
+
+== The five-layer model
+
+Every backend implements the same five layers. Each layer offers three
+operations: `probe` (read-only diagnosis), `rescue` (copy data out, never write
+the source) and `repair` (gated write).
+
+. *Registration* — the host's record that the guest exists.
+. *Container* — the virtual-disk file format.
+. *Filesystem* — the guest filesystem inside the container.
+. *Runtime* — the VM / kernel / process state that runs the guest.
+. *Config* — the files that decide whether the guest boots.
+
+A diagnosis names the failing layer(s). Repairs are ordered bottom-up from the
+lowest broken layer.
+
+== What is special about WSL (backend 1)
+
+Registration::
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss\{GUID}` — `BasePath`,
+`DistributionName`, `DefaultUid`, `Flags`, `Version`, `VhdFileName`, optional
+`PackageFamilyName`. A lost key leaves an intact but orphaned `.vhdx`. Re-register
+via `wsl --import-in-place`, or by recreating the key (decide which in E5).
+
+Container::
+WSL2 disks are dynamic VHDX. Verify every structure against Microsoft's
+*[MS-VHDX]* specification before coding: dual headers with sequence numbers and
+CRC-32C, a metadata log that may need replay, region table, BAT, metadata region.
+Host-side failure modes that are not corruption: NTFS compression, EFS, the
+read-only attribute (all produce "Access is denied"), files locked by backup or
+antivirus software, sparse/TRIM behaviour (`wsl --manage <d> --set-sparse`).
+Windows cannot read ext4; `Mount-VHD` needs the Hyper-V role (absent on Home);
+`wsl --mount` needs elevation.
+
+Filesystem::
+ext4 written directly to the disk: *no partition table* (partition-scanning
+tools misread it). *Version skew is a safety rule:* WSL's kernel may enable ext4
+features (`orphan_file`, `metadata_csum_seed`, …) newer than a given e2fsprogs.
+The tool must read the superblock's feature flags and *refuse* any write if the
+rescue distro's e2fsprogs does not support every feature present.
+
+Runtime::
+All WSL2 distros share one utility VM and kernel. Abrupt VM teardown (Windows
+shutdown, hibernate, Fast Startup, power loss) causes the "mounted read-only as a
+fallback" state. The chicken-and-egg problem — repairing Linux needs a working
+Linux — is solved by the tool's own rescue distro, attached to the broken disk with
+`wsl --mount <vhdx> --vhd --bare`. Docker Desktop holding the disk causes
+`ERROR_SHARING_VIOLATION`.
+
+Config::
+`/etc/wsl.conf`, `%UserProfile%\.wslconfig`, `/etc/wsl-distribution.conf`;
+`[boot] systemd`, `command`, automount and interop. A bad value stops boot with a
+healthy disk. Repair = parse, validate, and offer a safe-boot config.
+
+WSL 1 (out of scope for M1, but detect and refuse)::
+No disk image: files live on NTFS under `rootfs/` with Linux metadata in NTFS
+extended attributes. Windows tools that touch them destroy that metadata.
+
+== Safety invariants (must hold for every change)
+
+[cols="1,5", options="header"]
+|===
+| ID | Invariant
+
+| W1 | The original disk is never written. It is sealed (hash recorded) and copied; every write operation's type accepts only the working copy. Model it as an affine resource in the Idris2 state machine so the wrong call does not typecheck.
+| W2 | Every repair runs as: plan → dry-run → show diff → explicit confirm → commit → verify. No step is skippable by flag in M1.
+| W3 | Version-skew refusal (§3 Filesystem) is checked before any filesystem write.
+| W4 | Registry writes and `wsl --import*` are privileged; they go through W2 and are logged with before/after values.
+| W5 | No telemetry, no network calls. Reports contain paths and hashes, never file contents.
+| W6 | Every recovery report records what each step cost (files moved to `lost+found`, names lost by content carving, truncated values). Use the owner's echo / residual-evidence typing for this record where it fits; otherwise a plain typed ledger, and say which.
+| W7 | No silent green: a check that cannot run reports `not-run`, never `ok` (estate doctrine).
+|===
+
+== Milestone 0 — experiments before the tool
+
+Do these first. Each has an acceptance command (exit status decides) and a
+falsifier (what would show the work is wrong even if the command passes). Commit
+results as a receipt; do not move to M1 with any of them red or unrun.
+
+[cols="1,3,3,3", options="header"]
+|===
+| ID | Task | Acceptance | Falsifier
+
+| E1 | Fixture generator: small ext4 VHDX files, one injected fault each — torn VHDX header, unreplayed log, bad BAT entry, corrupt ext4 superblock (primary only), damaged htree directory index, newer-than-tool ext4 feature flag; plus host-side cases: compressed `.vhdx`, orphaned registry entry, bad `wsl.conf` | `just fixtures` regenerates byte-identically; each fixture's manifest names exactly one fault | a fixture that `qemu-img check` / `e2fsck -n` reports as clean, or with more than the declared fault
+| E2 | Baseline: run today's manual toolchain (qemu-img, e2fsck, debugfs, testdisk) against every fixture; record outcome and data recovered | a table in the receipt, one row per fixture | a row with no recorded outcome
+| E3 | Pure-Zig VHDX reader (header, region table, BAT, metadata, log detection) to Atoma subset | for every non-corrupt fixture, output is byte-identical to `qemu-img convert -O raw`; for each corrupt one, it names the fault | identical output on a fixture with a torn header (reader ignored the CRC)
+| E4 | Read-only ext4 probe in Zig: superblock, feature flags, group descriptors, checksums (crc32c) | detects every ext4 fault in E1; reports feature flags matching `dumpe2fs -h` | passing on a fixture after its checksum is deliberately broken
+| E5 | Registration probe (Windows): enumerate `Lxss`, match keys to `.vhdx` files, find orphans | detects the orphan fixture; no writes | any registry write during probe
+| E6 | Windows CI feasibility: can GitHub-hosted Windows runners run WSL2 and `wsl --mount`? | a workflow run that proves yes or no | assuming either answer without a run
+|===
+
+Watch each test fail before trusting it: break the thing it guards and confirm it
+goes red (estate rule).
+
+== Milestone 1 — full repair (after M0 is green)
+
+Order: registration → container → filesystem → config; runtime is diagnose-only
+in M1.
+
+* *Registration repair*: re-register orphans (method chosen from E5).
+* *Container repair*: clear compression/EFS/read-only; header recovery from the
+  valid copy; log replay. Writes only to the working copy (W1).
+* *Filesystem repair*: import the rescue distro (pinned e2fsprogs, signed image),
+  attach the working copy bare, enforce W3, run `e2fsck -fy -D` (backup
+  superblock on failure); fall back to `debugfs rdump` / ext4magic rescue.
+* *Config repair*: validator plus generated safe-boot config.
+* *Rescue*: read-only extraction path available at every layer.
+
+Exit gate: every E1 fixture either repaired to a state `e2fsck -fn` accepts, or
+rescued with the loss recorded per W6, and the original fixture's hash unchanged.
+
+== Atoma — what it can and cannot verify today
+
+Status as read from `hyperpolymath/atoma` docs at merge `8d78985` (2026-10-22);
+the gates were *not* re-run when this brief was written — re-run them first
+(`docs/plan/ULTRAPLAN.adoc` §Environment).
+
+* Can: zero-copy binary parsers over slices — bounds, overflow/underflow, cast
+  ranges, null unwraps, uninitialised reads, padding leaks — discharged by z3.
+  `frame-v1` (a CRC-checked frame parser) is the model to copy for E3/E4.
+* Bounded loops need `@invariant` and `@decreases`; the ext4 extent tree (depth
+  ≤ 5) must be a bounded loop, not recursion.
+* Cannot yet: allocators, recursion, callbacks, threads, `@cImport`, ambient I/O.
+  So all Windows API, file I/O and orchestration live in an *unverified shell*
+  around the verified parsers.
+* Status class is `INCOMPLETE (Warrant)`: solver answers are trusted, not
+  kernel-checked; the Idris2 face has never been compiled (Atoma T5). Do not
+  describe subsystem-warrior's parsers as "proved"; say "Atoma-checked, Warrant".
+* Atoma's milestone S needs "a second worked example verified end to end". The
+  VHDX header parser (E3) is offered as that example — coordinate via an issue on
+  `hyperpolymath/atoma`; do not commit into Atoma from this repo.
+
+== Owner-only actions (prepare, do not perform)
+
+* `just repo-init` — the repo is still an unminted template copy (placeholders,
+  deed says `rsr-template-repo`). Minting rewrites identity: owner action.
+* Visibility, branch protection, secrets, and deleting the stray
+  `governance-badges` branch (fixed at source by the separate
+  `rsr-template-repo` badge patch).
+* Anything that force-pushes or rewrites history.
+
+== Deliverables expected back
+
+. A short plan PR first: this file committed as `docs/plan/WSL-HANDOFF.adoc`, the
+  directory layout you propose, and task cards for E1–E6 (no code).
+. Then one PR per experiment, each with its receipt and the falsifier you ran.
+. Issues to open (not fix here): Atoma second-example proposal; `zig-vhdx` and
+  `zig-ext4-ro` as possible standalone estate packages; later backends.
+
+== Open questions to put to the owner, not to decide alone
+
+* Re-registration method: `wsl --import-in-place` vs recreating the `Lxss` key.
+* Rescue distro base (Alpine vs Wolfi/Chainguard, which the estate's container
+  templates already use) and how it is signed.
+* Whether the Windows executable is built with Zig cross-compilation from Linux
+  CI, given E6's answer.

@@ -1,0 +1,118 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= E6 — Windows CI feasibility
+:toc:
+
+[cols="1,4"]
+|===
+| Status | planned
+| Depends on | nothing (runs first, in parallel with E1)
+| Feeds | where E5 and the Windows-only fixtures run; M1 test bed; owner's cross-compilation question
+| Rulings | P4 (runs first)
+|===
+
+== Goal
+
+Answer, *with a workflow run*, whether GitHub-hosted Windows runners can:
+
+. run a WSL2 distro;
+. `wsl --mount <vhdx> --vhd --bare` a disk into it;
+. see that disk as a block device inside the distro (`lsblk`) and run
+  `e2fsck -fn` on it.
+
+== Hypothesis, not answer
+
+Community reports suggest standard hosted runners lack the nested
+virtualisation WSL2 needs, while WSL1 works. That is *hypothesis H0*, stated
+so the run can refute it. Assuming either answer without a run is this card's
+falsifier.
+
+== Method
+
+* New workflow `.github/workflows/m0-windows-probe.yml`, `workflow_dispatch`
+  plus pull requests touching it. Matrix: `windows-2022`, `windows-2025`
+  (record the image versions the run reports).
+* *PowerShell steps only, no third-party actions.* That keeps the
+  action-pinning gate and `actions.lock` unchanged, and keeps the evidence
+  free of an action's hidden setup. If `actions/checkout` is needed, use the
+  pinned SHA already in `actions.lock`.
+* Each step records a ternary verdict, `yes` / `no` / `not-run: <reason>`,
+  into an I-JSON/JCS artefact:
+  .. `systeminfo` / `Get-ComputerInfo` Hyper-V and virtualisation fields;
+  .. `wsl --version`, `wsl --status`;
+  .. `wsl --install --no-distribution` if WSL is absent (record reboot
+     needs; a needed reboot is a `no` for hosted CI);
+  .. import a tiny rootfs with `wsl --import … --version 2`. The rootfs is
+     pinned by sha256 and fetched over HTTPS; network use in CI is outside
+     W5, which binds the tool;
+  .. `wsl -d <name> -- uname -a` and `cat /proc/version` (WSL2 kernel or not);
+  .. `wsl --mount <X-CLEAN.vhdx> --vhd --bare`, then `wsl -d <name> -- lsblk`;
+  .. `e2fsck -fn` on the attached device;
+  .. fallback probe: the same import with `--version 1`, to bound what *is*
+     available.
+* The `.vhdx` for the mount steps is `X-CLEAN` from E1 if E1 has landed;
+  otherwise a one-off `qemu-img` image made in a Linux job and passed as an
+  artefact. The receipt records which.
+* *Cross-compilation smoke test:* a Linux job builds a trivial Zig
+  `x86_64-windows` executable, and the Windows job runs it. This answers the
+  smallest form of the owner's question.
+
+== Acceptance (exit status decides)
+
+The workflow exits 0 iff every step produced a recorded verdict (yes, no or
+not-run with a reason). "WSL2 does not work" is a *successful* E6 outcome.
+The receipt then states the answer and its consequences.
+
+== Falsifiers
+
+* Concluding yes or no without a run URL in the receipt.
+* A step with no recorded verdict.
+* Reading a step's success from its exit code alone, where `wsl.exe` is known
+  to print errors in UTF-16 and may exit 0. Each step also checks its output.
+
+== Mutations — watch it go red
+
+* Point the mount step at a nonexistent path: that step must record `no`
+  with the error, not `yes`.
+* Remove one step's verdict write: the completeness check must fail the
+  workflow.
+
+== Consequences of each answer
+
+[cols="1,3",options="header"]
+|===
+| Answer | Then
+
+| WSL2 + bare mount work
+| E5 and the Windows-only fixtures run on hosted runners. M1's end-to-end
+  tests can run in CI.
+
+| WSL1 only
+| E5 still runs (it needs only the registry and the filesystem). End-to-end
+  WSL2 tests need another host. Options for the owner, all beyond this repo: a
+  self-hosted Windows runner, a cloud VM with nested virtualisation, or a
+  larger runner type if GitHub offers one with it.
+
+| No WSL at all
+| As above, and `C-HOST-COMPRESSED` must be built on an owner machine and
+  committed as a signed scenario recipe.
+|===
+
+== Aspects
+
+* *Security:* no secrets are needed, and the workflow requests read-only
+  `permissions:`. The runner is disposable, so registry and WSL changes there
+  are harmless and are never repeated on a developer machine.
+* *Cost:* Windows minutes bill at a multiple of Linux minutes. Keep the
+  matrix to two images and dispatch-only after the first answer.
+* *Honesty:* both "yes" and "no" are green outcomes. Only "unknown" is red.
+
+== Beyond this repo
+
+The answer is estate knowledge: any estate repo wanting Windows/WSL CI hits
+the same wall. Record it where `standards` keeps CI platform notes.
+
+== Receipt
+
+`verification/tests/m0/E6-receipt.adoc` and `.json`, with the run URL(s) and
+the runner image versions.

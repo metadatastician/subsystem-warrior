@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= E2 — Baseline with today's manual toolchain
+:toc:
+
+[cols="1,4"]
+|===
+| Status | planned
+| Depends on | E1 (fixtures, payload manifest)
+| Feeds | E3, E4 (what "better than today" means); M1 repair design; W6 ledger shape
+| Rulings | P3 (Guix pin)
+|===
+
+== Goal
+
+Record what a skilled human gets today from `qemu-img`, `e2fsck`, `debugfs`
+and `testdisk` on every E1 fixture: the outcome, and how much of the payload
+comes back. Later work is judged against this table.
+
+== Method
+
+. Add `testdisk` (and `ext4magic`, if the pinned Guix packages it) to
+  `build/manifest.scm`. Record which tools were *not* available as `not-run`
+  rows, never as omissions (W7).
+. For each fixture, work on a *copy*. Before and after, check the original's
+  sha256 against its manifest; any change fails E2. This rehearses W1.
+. Apply a fixed, scripted procedure per tool, so the baseline is
+  reproducible and not "whatever the operator tried":
+  ** `qemu-img info`, `qemu-img check`, then `qemu-img check -r all` on a copy
+     when check reports something repairable, then `qemu-img convert -O raw`;
+  ** on the raw image: `e2fsck -fn`; if that reports a fault, `e2fsck -fy`
+     on a copy; if the primary superblock is unusable, `e2fsck -b <backup>`;
+  ** `debugfs -c -R "rdump / <out>"` (catastrophic mode, read-only);
+  ** `testdisk /list` and, where it finds the filesystem, its file listing.
+. Score recovery against `payload.json`: files intact (sha256 match), files
+  damaged, files in `lost+found` with lost names, files missing. This is the
+  first draft of the W6 cost ledger.
+
+== Acceptance (exit status decides)
+
+`just baseline-check` exits 0 iff the receipt table has one row per
+(fixture × tool step), and every row has an outcome from {`ok`, `fault-found`,
+`repaired`, `failed`, `not-run: <reason>`} plus the recovery score.
+`not-run` is allowed in the table but makes the *receipt* amber, not green
+(W7).
+
+== Falsifiers
+
+* A row with no recorded outcome.
+* An original fixture whose sha256 changed during the baseline.
+
+== Mutations — watch it go red
+
+* Delete one row from the generated table: `baseline-check` must fail.
+* Let one procedure touch the original instead of the copy (in a throw-away
+  branch of the test): the sha256 guard must fail.
+
+== Risks and unknowns
+
+* `testdisk` is interactive by design. Only its scriptable `/list` /
+  `/cmd` paths are usable, and their coverage of ext4 must be checked.
+* Windows-only fixtures (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`) get their
+  baseline from the Windows tools a user would actually reach for (`compact`,
+  `attrib`, `reg query`, `wsl --mount`), recorded by the E6/E5 Windows job.
+
+== Aspects
+
+* *Honesty:* the baseline is allowed to be good. If a fault class is fully
+  handled by `e2fsck -fy`, the receipt says so, and M1's value there is
+  orchestration and safety (W1–W4), not new repair logic.
+* *Licensing:* the tools are only *run*, never vendored or linked; record
+  their licences in the receipt for M1's rescue-distro bill of materials.
+
+== Beyond this repo
+
+The baseline table is a useful public artefact in its own right ("what the
+standard toolchain does with each WSL failure mode"). It could feed WSL
+troubleshooting docs or an estate write-up later.
+
+== Receipt
+
+`verification/tests/m0/E2-receipt.adoc` and `.json`.

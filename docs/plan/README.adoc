@@ -1,0 +1,177 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= subsystem-warrior — plan index (Milestone 0)
+:toc:
+
+This directory holds the plan for the WSL backend of subsystem-warrior. It is a
+*plan only*: no code lands until the owner approves the plan PR.
+
+[cols="1,3",options="header"]
+|===
+| File | What it is
+
+| link:WSL-HANDOFF.adoc[WSL-HANDOFF.adoc]
+| The handoff brief, revision 1 (2026-10-27), committed verbatim
+  (sha256 `f9331df2dc097a7f472c2fed2aa2cee036ba8514e66cf1a0cb7c64113ab9aa34`).
+  It is the source of every decision this plan does not record below.
+
+| link:LAYOUT.adoc[LAYOUT.adoc]
+| The proposed directory layout, fitted to this template's canon.
+
+| link:m0/E1-fixtures.adoc[m0/E1] … link:m0/E6-windows-ci.adoc[m0/E6]
+| One task card per Milestone 0 experiment.
+|===
+
+== Owner rulings taken for this plan (2026-10-27)
+
+These were put to the owner through the selector before the cards were written.
+Each card cites the ruling it depends on.
+
+[cols="1,2,3",options="header"]
+|===
+| ID | Question | Ruling
+
+| P1 | Where the plan lives
+| `docs/plan/`, registered in the deed's docs ply `canonical-locations` —
+  *but* see P5: registration waits on an upstream writer fix.
+
+| P2 | How `just fixtures` becomes byte-identical
+| `qemu-img` builds each VHDX; a small Zig *normaliser* pins every GUID to a
+  value derived from the fixture name and recomputes the checksums. The
+  oracle (qemu) and our reader (E3) stay independent implementations.
+
+| P3 | How the toolchain is pinned
+| `guix time-machine -C build/channels.scm` (estate-native, Guix not Nix). The
+  receipt of every experiment records the channel commit.
+
+| P4 | Order of the experiment PRs
+| E6 ‖ E1 → E2 → E3 ‖ E4 → E5 (see <<sequence>>).
+
+| P5 | Registering `plan/` in the deed
+| `scripts/deed-clause.sh` addresses a clause by name and takes the first
+  match, so it cannot reach the `docs-pillar` `(directory …)` clause, a later
+  sibling. Fix the writer *at source* (rsr-template-repo) first, then register.
+  Until then `docs/plan/` is a known, recorded gap; no gate checks it.
+
+| P6 | E4 cannot see htree damage with the scope the brief gives it
+| Extend E4 with a bounded, read-only inode → extent → directory-block walk.
+
+| P7 | E3 torn-header falsifier vs. a correct dual-header reader
+| A reader of a VHDX with *one* torn header returns the data from the valid
+  copy *and* must name fault `C-HDR-TORN`. A second fixture with *both*
+  headers torn (`C-HDR-TORN-BOTH`) is added, where refusal is the only correct
+  answer. *Departure from the brief:* the brief's fixture list does not contain
+  this fixture.
+
+| P8 | `docs/status/ROADMAP.adoc`
+| Left untouched: it is still the template's own journal and `just repo-init`
+  replaces it at mint. The first experiment PR after mint seeds the new
+  ROADMAP from this file.
+|===
+
+[[sequence]]
+== Sequence
+
+[literal]
+....
+  E6 (Windows CI feasibility) ─────────────────────────────────┐
+                                                               ├─► E5 (registration probe)
+  E1 (fixtures) ─► E2 (baseline) ─┬─► E3 (VHDX reader) ──┐     │
+                                  └─► E4 (ext4 probe) ───┴─────┘
+....
+
+* E6 is a cheap, independent probe. Its answer decides where the Windows-only
+  fixtures (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`) are built and where E5 runs,
+  so it runs first, in parallel with E1.
+* E3 and E4 are independent parsers over E1's fixtures. E2 comes before them
+  so the parsers are measured against a recorded baseline.
+* E5 is last. Note that E5 reads the registry and the filesystem only. It does
+  *not* need WSL2 to be running, so a "no" from E6 limits E5's test bed less
+  than it limits M1.
+
+Each experiment is one PR carrying its code, its receipt and the falsifier it
+ran (brief §Deliverables). M0 is green only when all six receipts are green;
+a receipt with any step `not-run` is not green (W7).
+
+== Conflicts found between the brief and the canon
+
+The brief says the canon wins and conflicts must be reported, not resolved
+silently. These are the ones found while planning.
+
+. *`docs/plan/` is not a canonical docs location* (deed `ply`, `docs-pillar`).
+  Resolution: P1/P5 above.
+. *`mise.toml` pins every tool to `latest`* (PROVISIONING-STANDARD §4), while
+  byte-identical fixtures and the W3 version-skew rule both need exact
+  versions. Resolution: P3 uses the Guix pin the template already carries
+  (`build/channels.scm`) for the experiment toolchain. `mise.toml` is not
+  changed. If Atoma needs a Zig version that the pinned Guix channel does not
+  provide, the conflict comes back to the owner (card E3).
+. *The anchor clause still carries unfilled template tokens* (its `:repo`
+  is the owner/repo placeholder pair), and the deed names `rsr-template-repo`. That is the unminted state the brief
+  describes. Minting is owner-only (`just repo-init`).
+. *Commit signing.* Doctrine 9 asks for `id_ed25519_signing`. Commits from
+  this cloud session are signed by the session's own SSH signing key, not the
+  owner's key. Each PR states which key signed it.
+
+== Owner-only actions (prepared, not performed)
+
+From the brief, plus what this plan adds:
+
+* `just repo-init` (mint). It rewrites identity, the deed name and ROADMAP.
+* Visibility, branch protection, secrets, and deleting the stray
+  `governance-badges` branch.
+* Anything that force-pushes or rewrites history.
+* Opening issues on other repositories. This plan only drafts them; see
+  <<upstream>>.
+* Capturing and signing a real WSL-made `ext4.vhdx` as a golden reference, if
+  ever wanted (P2 alternative; not in M0).
+
+[[upstream]]
+== Work that belongs beyond this repository
+
+Kept as a list so it can be tracked and acted on where it lives.
+
+[cols="1,2,1",options="header"]
+|===
+| Where | What | When
+
+| `hyperpolymath/rsr-template-repo`
+| `deed-field.sh` / `deed-clause.sh`: address a clause by `:id`
+  (e.g. `ply/directory[docs-pillar]/canonical-locations`), so siblings after
+  the first can be read and written by the one writer. Unblocks P5. Every
+  minted repo inherits the fix.
+| now (draft for the owner)
+
+| `hyperpolymath/atoma`
+| Offer the VHDX header parser as milestone S's "second worked example".
+  Coordination by issue only; no commits into Atoma from here.
+| after E3 shows the header parser Atoma-checked
+
+| estate (new packages)
+| `zig-vhdx` and `zig-ext4-ro` as standalone packages. The layout keeps the
+  verified parsers self-contained so they can be lifted out cheaply.
+| after E3 / E4
+
+| estate (later backends)
+| Docker Desktop / Rancher Desktop / Podman machine disks, Lima/Colima,
+  ChromeOS Crostini.
+| after M1
+
+| `hyperpolymath/standards`
+| If the pinned-toolchain pattern of P3 proves useful, a shared
+  "pinned fixture toolchain" recipe; and whether `plan/` should be a
+  canonical docs location estate-wide.
+| after E1
+|===
+
+== Open questions still with the owner (from the brief)
+
+These are not decided here. Each card names the evidence it will produce for
+them, so the owner can decide with data.
+
+* Re-registration method: `wsl --import-in-place` vs. recreating the `Lxss`
+  key — evidence from E5.
+* Rescue distro base (Alpine vs. Wolfi/Chainguard) and its signing — the
+  e2fsprogs feature tables from E4 feed this.
+* Whether the Windows executable is cross-compiled with Zig from Linux CI —
+  E5 builds its probe that way, and E6 says whether CI can run it.
