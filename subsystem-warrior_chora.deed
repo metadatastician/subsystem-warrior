@@ -1,5 +1,8 @@
 ;; SPDX-License-Identifier: MPL-2.0
 ;
+; Inherited template identity is retained until the owner runs repo-init.
+; The filename follows this repository's slug so CI can read its canon pin.
+;
 ; The repo deed of rsr-template-repo: one-deed-per-repo doctrine (standards#837,
 ; owner ruling 2026-09-19, Option A). Folds the former ply manifest tree
 ; (82 per-directory manifests) and the family-7 AI allocation manifest
@@ -30,9 +33,9 @@
   ; equal canon.lock [canon.artifacts]; canon.lock [canon.lockstep].order is
   ; spine-adopts-then-canon-releases, so this clause moves FIRST.
   (canon
-    :version "2.1.2"
+    :version "2.1.3"
     :criteria-sha256 "6a5aa8857bd0d0d58ef48827938ca17c251b6b854dacf59d306388d61694d82a"
-    :gates-sha256 "e70efd2f53c9445e30da4baf770366f04a4a84ffd844a01426e587e565b53e6a"
+    :gates-sha256 "2f31f46d4753432e0aa8c9c28f339e18e062c98dc6e6ef4ecbb76993cf37638b"
     :lockstep-since "2026-09-17"
     ; A canon change this repo cannot satisfy is a change made in the WRONG
     ; ORDER, not a rejected change: land the spine's adoption first, then the
@@ -184,8 +187,8 @@
   (ply
     (directory :ply 1 :path ".github")
     (directory :id "machine-readable-pillar" :ply 1 :path ".machine_readable" :description "Registry for all machine-readable metadata, policies, and internal\nautomation scripts."
-      (canonical-locations :ai_configs "ai/" :anchor "rsr-template-repo_chora.deed (anchor)" :compliance "compliance/" :neurosym "rsr-template-repo_chora.deed (neurosym)" :playbook "rsr-template-repo_chora.deed (playbook)" :policies "rsr-template-repo_chora.deed (policies)" :scripts "scripts/")
-      :invariants ("Repo metadata MUST live in the repo deed (rsr-template-repo_chora.deed) and follow the DEED grammar" "Internal automation MUST live in scripts/ subfolder")
+      (canonical-locations :ai_configs "ai/" :anchor "subsystem-warrior_chora.deed (anchor)" :compliance "compliance/" :neurosym "subsystem-warrior_chora.deed (neurosym)" :playbook "subsystem-warrior_chora.deed (playbook)" :policies "subsystem-warrior_chora.deed (policies)" :scripts "scripts/")
+      :invariants ("Repo metadata MUST live in the repo deed (subsystem-warrior_chora.deed) and follow the DEED grammar" "Internal automation MUST live in scripts/ subfolder")
       (directory :id "ai-registry" :ply 2 :path ".machine_readable/ai" :description "Sub-registry for ai metadata.")
       (directory :id "configs-registry" :ply 2 :path ".machine_readable/configs" :description "Sub-registry for configs metadata.")
       (directory :ply 0 :path ".machine_readable/descriptiles" :description "This manifest declares the AI-assistant context for the descriptiles machine-readable metadata directory."
@@ -612,7 +615,7 @@
         ; The pattern ".*" allows hidden dotfiles implicitly; RRA checks specific
         ; dotfile rules below.
         (allow-list
-          :files ("README.adoc" "CHANGELOG.adoc" "Justfile" "LICENSE" "rsr-template-repo_chora.deed" "CITATION.cff" "CLAUDE.md")
+          :files ("README.adoc" "CHANGELOG.adoc" "Justfile" "LICENSE" "subsystem-warrior_chora.deed" "CITATION.cff" "CLAUDE.md")
           :patterns (".*"))
         ; Relocation rules: move heavy prose out of the root
         (relocations

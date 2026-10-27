@@ -108,7 +108,10 @@ silently. These are the ones found while planning.
   provide, the conflict comes back to the owner (card E3).
 . *The anchor clause still carries unfilled template tokens* (its `:repo`
   is the owner/repo placeholder pair), and the deed names `rsr-template-repo`. That is the unminted state the brief
-  describes. Minting is owner-only (`just repo-init`).
+  describes. Minting is owner-only (`just repo-init`). The inherited deed
+  is named `subsystem-warrior_chora.deed` so the Canon lockstep gate can read
+  its pin; this filename correction leaves the template identity and anchor
+  tokens intact.
 . *Commit signing.* Doctrine 9 asks for `id_ed25519_signing`. Commits from
   this cloud session are signed by the session's own SSH signing key, not the
   owner's key. Each PR states which key signed it.
