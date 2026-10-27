@@ -38,7 +38,7 @@ The descriptive family (working name *descriptiles*) describes what-is; the **co
 
 | File | Answers |
 |---|---|
-| `subsystem-warrior_chora.deed` | **CHORA**, the repo deed. Its `(identity)` `(clade)` `(lineage)` clauses say what this repo IS (registers into `gv-clade-index`); `(meta)` the architecture axes; `(agentic)` *may I act now?*; `(ecosystem)` where it sits and what it is not; `(status)` and `(maturity)` where it is now. Read fields with `scripts/deed-field.sh`. |
+| `rsr-template-repo_chora.deed` | **CHORA**, the repo deed. Its `(identity)` `(clade)` `(lineage)` clauses say what this repo IS (registers into `gv-clade-index`); `(meta)` the architecture axes; `(agentic)` *may I act now?*; `(ecosystem)` where it sits and what it is not; `(status)` and `(maturity)` where it is now. Read fields with `scripts/deed-field.sh`. |
 | `(anchor)` | *Semantic authority + golden path* — what downstream may extend-not-redefine; if a recognised-drift / re-anchor marker is present, it **supersedes** accumulated context — read it first. |
 | `(neurosym)` | *Meaning* of operations — proof obligations. |
 | `(playbook)` | *How* permitted actions run. |
@@ -131,7 +131,7 @@ hand; that migration is done per repo (ADR-008 phase P3). In deed files use
 - Grammars: `standards/1-formats/deed/spec/abnf/deed.abnf` (authoritative
   over the deed README, D308) and `standards/1-formats/k9/` for k9.
 - Descriptiles (anchor, meta, state, ecosystem, agentic, neurosym, playbook)
-  are clauses of `subsystem-warrior_chora.deed` (D312).
+  are clauses of `rsr-template-repo_chora.deed` (D312).
 - Contractiles (intend, must, trust, adjust, bust, dust) are k9 contracts in
   `.machine_readable/contractiles/<verb>/`. The deed attests to them
   (`:contractiles_required`, and a `(contractiles …)` clause per D312).
