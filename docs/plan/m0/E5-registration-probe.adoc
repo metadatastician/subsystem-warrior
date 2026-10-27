@@ -59,10 +59,18 @@ Three independent checks, because any one of them can be fooled:
 
 . *Before/after snapshot:* `reg export` of the test root and of the real
   `Lxss` path before and after the probe, byte-compared.
-. *Static imports:* the probe's PE import table contains none of
-  `RegSetValue*`, `RegCreateKey*`, `RegDelete*`, `RegSaveKey*`,
-  `RegRestoreKey*`, `RegReplaceKey*` (checked with `llvm-objdump` or Zig's
-  own PE reader).
+. *Static imports:* check the probe's PE imports, including delay imports,
+  with `llvm-objdump` or Zig's own PE reader against a closed registry API
+  allowlist: `RegOpenKeyExW`, `RegEnumKeyExW`, `RegEnumValueW`,
+  `RegQueryInfoKeyW`, `RegQueryValueExW` and `RegCloseKey`. Reject every other
+  registry API, including `RegSetValue*`, `RegSetKeyValue*` (in particular
+  `RegSetKeyValueW`), `RegRenameKey`, `RegCreateKey*`, `RegDelete*`,
+  `RegSaveKey*`, `RegRestoreKey*`, `RegReplaceKey*`, `RegLoadKey*`,
+  `RegUnLoadKey*`, security setters, and native or wrapper mutation APIs.
+  Reject dynamic registry API resolution as well: no runtime library loading
+  or symbol resolution to bypass the allowlist. Check imports and source for
+  `LoadLibrary*`, `GetProcAddress`, `LdrLoadDll`, `LdrGetProcedureAddress` and
+  equivalent resolver paths.
 . *Access mask:* every `RegOpenKeyExW` call site passes `KEY_READ`. This is
   a source grep in the test, which is crude but fails loudly.
 
@@ -70,6 +78,8 @@ Three independent checks, because any one of them can be fooled:
 
 * Add a harmless `RegSetValueExW` call behind a test-only flag: checks 1 and 2
   must fail.
+* Add imports of `RegSetKeyValueW` and `RegRenameKey` separately, then a
+  dynamic registry resolver: static check 2 must reject each mutation.
 * Open one key with `KEY_ALL_ACCESS`: check 3 must fail.
 * Delete the orphan's `.vhdx` mid-scenario: the orphan becomes neither an
   orphan nor a dangling key, and the probe must report that, not crash.
@@ -77,10 +87,14 @@ Three independent checks, because any one of them can be fooled:
 == Evidence for the owner's open question
 
 Re-registration (`wsl --import-in-place` vs. recreating the key) is *not*
-decided here. E5's receipt records, for the CI runner's WSL version, which
-values `--import-in-place` writes compared with an original key. The owner
-then decides with that diff in hand. Note: `wsl --unregister` *deletes the
-disk* (Microsoft documents that all data is lost), so no repair path may
+decided here. E5 consumes a pre-generated comparison of the values
+`--import-in-place` writes versus an original key, recording its provenance
+and WSL version in the receipt. Any `wsl --import-in-place` execution belongs
+to a separate owner-gated re-registration experiment, outside E5's probe and
+no-write checks. If the comparison is unavailable, record that evidence as
+`not-run`, never generate it during E5. The owner then decides with that diff
+in hand. Note: `wsl --unregister` *deletes the disk* (Microsoft documents that
+all data is lost), so no repair path may
 ever call it. M1 must make that call unrepresentable.
 
 == Aspects

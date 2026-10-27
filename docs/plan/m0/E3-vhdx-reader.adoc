@@ -40,7 +40,8 @@ Atoma verifiable Zig subset.
   frame parser).
 * `src/interface/ffi/src/shell/vhdx_cat.zig` does the file I/O: it reads
   regions, hands slices to `verified/`, and writes raw bytes to stdout and a
-  fault report (I-JSON/JCS) to a file.
+  fault report (I-JSON/JCS) to a file. Validate all payload BAT entries before
+  writing any raw bytes, so `C-BAT-BAD` produces no partial raw output.
 * An `m0` step in `build.zig`, so E3 compiles before mint (LAYOUT note 5).
 
 == Torn-header rule (P7)
@@ -60,9 +61,13 @@ Atoma verifiable Zig subset.
   `qemu-img convert -O raw` of the same file (sha256 compared).
 . For every `C-*` fixture: the fault report names exactly the fixture's
   declared fault id.
-. For `C-HDR-TORN`: the data also matches the qemu raw image.
-. For `C-HDR-TORN-BOTH` and `C-LOG-UNREPLAYED`: no data, the fault is named,
-  and the exit code is nonzero.
+. For `C-HDR-TORN`: the raw-image sha256 also matches qemu's, and the report
+  includes the failed header identifier plus both stored (expected) and
+  computed (actual) CRC values, checked against E1's independent header-CRC
+  oracle. Missing or incorrect identifiers or CRCs fail acceptance.
+. For `C-HDR-TORN-BOTH`, `C-LOG-UNREPLAYED` and `C-BAT-BAD`: raw stdout is
+  exactly zero bytes, the declared fault is named, and the exit code is
+  nonzero. Partial raw output fails acceptance.
 . Atoma's checker passes on every file under `verified/` at the pinned Atoma
   commit, and the receipt records the status class (`INCOMPLETE (Warrant)` or
   whatever Atoma reports then).
@@ -71,13 +76,17 @@ Atoma verifiable Zig subset.
 
 * Identical output on `C-HDR-TORN` *without* `C-HDR-TORN` named. That means
   the reader ignored the CRC.
-* Any output on `C-HDR-TORN-BOTH`.
+* Any raw output on `C-HDR-TORN-BOTH`, `C-LOG-UNREPLAYED` or `C-BAT-BAD`.
 * A non-corrupt fixture whose output differs from qemu's.
 
 == Mutations — watch it go red
 
 * Replace the header CRC check with `true`: the `C-HDR-TORN` and
   `C-HDR-TORN-BOTH` tests must fail.
+* Omit the failed header identifier or either CRC from the torn-header report:
+  the `C-HDR-TORN` test must fail.
+* Emit one raw byte before refusing `C-BAT-BAD`: its zero-output check must
+  fail, even if the fault id and exit status are correct.
 * Off-by-one in the BAT entry-to-offset calculation: the byte-identity checks
   must fail.
 * Remove one `@invariant`: the Atoma check must fail. If it does not, record

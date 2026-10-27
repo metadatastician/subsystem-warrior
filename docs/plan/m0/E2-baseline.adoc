@@ -22,8 +22,14 @@ comes back. Later work is judged against this table.
 . Add `testdisk` (and `ext4magic`, if the pinned Guix packages it) to
   `build/manifest.scm`. Record which tools were *not* available as `not-run`
   rows, never as omissions (W7).
-. For each fixture, work on a *copy*. Before and after, check the original's
-  sha256 against its manifest; any change fails E2. This rehearses W1.
+. For each fixture, work on a *copy*. For Linux fixtures, before and after,
+  check the original's sha256 against its committed manifest. For Windows-only
+  `C-HOST-COMPRESSED` and `R-ORPHAN-DISK`, verify the documented recipe and
+  resulting state against the scenario manifest (compression attribute set,
+  or disk present with no referring `Lxss` key). Capture a run-local sha256
+  and host-state snapshot before and after to guard the original; these
+  hashes are not compared with committed manifests. Any change fails E2.
+  This rehearses W1.
 . Apply a fixed, scripted procedure per tool, so the baseline is
   reproducible and not "whatever the operator tried":
   ** `qemu-img info`, `qemu-img check`, then `qemu-img check -r all` on a copy
@@ -39,8 +45,10 @@ comes back. Later work is judged against this table.
 == Acceptance (exit status decides)
 
 `just baseline-check` exits 0 iff the receipt table has one row per
-(fixture × tool step), and every row has an outcome from {`ok`, `fault-found`,
-`repaired`, `failed`, `not-run: <reason>`} plus the recovery score.
+(fixture × tool step), the Linux committed-hash checks and Windows recipe,
+state and run-local preservation checks above pass, and every row has an
+outcome from {`ok`, `fault-found`, `repaired`, `failed`, `not-run: <reason>`}
+plus the recovery score.
 `not-run` is allowed in the table but makes the *receipt* amber, not green
 (W7).
 
@@ -48,6 +56,8 @@ comes back. Later work is judged against this table.
 
 * A row with no recorded outcome.
 * An original fixture whose sha256 changed during the baseline.
+* A Windows-only fixture whose recipe or state does not match its scenario
+  manifest, or whose host state changes during the baseline.
 
 == Mutations — watch it go red
 

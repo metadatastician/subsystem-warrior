@@ -35,8 +35,9 @@ Ids are `<layer>-<name>`. Layer letters: `R` registration, `C` container,
 | Linux
 | CRC-32C of the *current* (higher-sequence) header made invalid; the other
   header is intact
-| *to be established* — qemu may silently choose the valid header and report
-  clean (see Risks)
+| use the valid header for data; an independent header-CRC check reports
+  `C-HDR-TORN`, identifying the failed copy and its expected and actual CRC.
+  qemu may report clean after selecting the valid header.
 
 | `C-HDR-TORN-BOTH`
 | Linux
@@ -120,20 +121,35 @@ picks the rescue base. Until then it is noted, not built.
   checksum covering an edited byte.
 . *Faults.* Apply each fault after normalisation. Recompute every checksum
   except the one the fault is about, so the image carries exactly one fault.
+  For `C-HDR-TORN`, independently check both 4 KiB headers with their checksum
+  fields zeroed (`rhash --crc32c`, subject to pinned-build verification).
+  Record the stored (expected) and computed (actual) CRC and the failed copy;
+  exactly one header must fail, while qemu's raw output uses the valid header.
+  This CRC oracle is required even when `qemu-img check` reports clean.
   `C-LOG-UNREPLAYED` needs us to *write* log entries. Its independent check is
   that `qemu-img check -r all` replays them, and that the replayed raw image
   equals the intended raw image.
 . *Manifests.* Write one I-JSON/JCS manifest per fixture: id, declared fault
-  ids (exactly one, or zero for `X-CLEAN`), sha256 of the `.vhdx` and of the
-  raw image, tool versions, Guix commit, oracle command, oracle exit code and
-  a digest of the oracle's output.
+  ids (exactly one, or zero for `X-CLEAN`), tool versions, oracle command,
+  oracle exit code and a digest of the oracle's output. Linux manifests also
+  record sha256 of the `.vhdx` and raw image, the Guix commit, virtual size,
+  filesystem UUID, and independently recorded expected `compat`, `incompat`
+  and `ro_compat` masks after fault injection (from the intact backup for
+  `F-SB-PRIMARY`). Windows-only manifests record the scenario recipe and
+  resulting host state instead of a reproducible image hash.
 
 == Acceptance (exit status decides)
 
 `just fixtures-check` exits 0 iff all of the following hold:
 
-. `just fixtures` run twice into two fresh directories yields the same sha256
-  for every file, *and* those equal the committed manifests.
+. For Linux-built fixtures, `just fixtures` run twice into two fresh
+  directories yields the same sha256 for every generated file, *and* those
+  equal the committed manifests.
+. For Windows-only `C-HOST-COMPRESSED` and `R-ORPHAN-DISK`, verify the
+  documented recipe and resulting state against the scenario manifest:
+  respectively, a clean `.vhdx` with its NTFS compression attribute set, and
+  an existing `.vhdx` with no `Lxss` key referring to its path. Record the
+  Windows checks; committed image-hash comparisons do not apply.
 . Every manifest names exactly one fault id (zero for `X-CLEAN`), and that id
   exists in `src/errors/faults.json`.
 . For every Linux-built fixture, the oracle's verdict matches the
@@ -143,9 +159,12 @@ picks the rescue base. Until then it is noted, not built.
 == Falsifiers to run (and record in the receipt)
 
 * A fixture that `qemu-img check` / `e2fsck -n` reports as clean, other than
-  `X-CLEAN` and `K-WSLCONF-BAD`.
+  `X-CLEAN`, `K-WSLCONF-BAD` and `C-HDR-TORN` (whose independent header-CRC
+  oracle must still report its declared fault).
 * A fixture whose oracle output reports more than the declared fault.
-* Two regenerations that differ in any byte.
+* Two Linux-fixture regenerations that differ in any byte.
+* A Windows-only fixture whose recipe or observed state differs from its
+  scenario manifest.
 
 == Mutations — watch it go red
 
@@ -157,12 +176,9 @@ picks the rescue base. Until then it is noted, not built.
 
 == Risks and unknowns
 
-* *qemu may be blind to `C-HDR-TORN`.* If it silently picks the valid header,
-  the brief's falsifier ("reported as clean") fires on a correct fixture.
-  Planned answer: a second, independent oracle for header CRCs — `rhash --crc32c`
-  over the 4 KiB header with its checksum field zeroed (rhash's CRC-32C
-  support to be confirmed in the pinned build). Record which oracle judged
-  each fixture.
+* *qemu may be blind to `C-HDR-TORN`.* The independent header-CRC oracle above
+  is mandatory; confirm rhash's CRC-32C support in the pinned build before
+  `fixtures-check` can pass. Record which oracle judged each fixture.
 * Whether qemu writes other random or time-based fields (beyond GUIDs) into
   VHDX metadata. Step 1 diffs two unnormalised conversions to find them all.
 * Windows-built fixtures (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`) cannot be byte
@@ -171,8 +187,9 @@ picks the rescue base. Until then it is noted, not built.
 
 == Aspects
 
-* *Determinism / reproducibility:* everything derives from the fixture id and
-  the Guix pin. No clock, no randomness, no network after the Guix fetch.
+* *Determinism / reproducibility:* Linux fixtures derive from the fixture id
+  and the Guix pin. No clock, no randomness, no network after the Guix fetch.
+  Windows-only fixtures are accepted by recipe and resulting state.
 * *Independence:* the generator shares no code with the reader (LAYOUT note 2).
 * *Privacy (W5):* the payload is synthetic; no real user data ever enters a
   fixture.

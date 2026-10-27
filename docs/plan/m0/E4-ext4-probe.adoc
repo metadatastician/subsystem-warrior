@@ -44,8 +44,16 @@ checks alone cannot see.
 * `shell/ext4_probe.zig` reads blocks on demand and emits an I-JSON/JCS
   report.
 * The primary superblock failing does *not* end the probe. It reports
-  `F-SB-PRIMARY`, then locates a backup (group 1 under `sparse_super`) and
-  continues. This is detection only, never repair.
+  `F-SB-PRIMARY`, then enumerates candidate backup superblocks within the raw
+  image by scanning locations allowed by the pinned format's supported block
+  sizes and alignment rules, with the image length bounding the scan.
+  Discovery must not assume group 1 or depend on the failed primary's
+  geometry to locate candidates. Include in-range
+  groups listed in `s_backup_bgs` for `sparse_super2`; unvalidated fields are
+  only search hints. Adopt a candidate only after validating its magic,
+  geometry (including group number, location and image bounds), feature flags
+  and CRC. Continue using that validated geometry; if no candidate validates,
+  report no usable backup and stop. This is detection only, never repair.
 
 == Acceptance (exit status decides)
 
@@ -55,9 +63,17 @@ checks alone cannot see.
 . `X-CLEAN`, `K-WSLCONF-BAD` and every `C-*` fixture (on the raw image from
   qemu, for the ones qemu can read): the probe reports no filesystem fault.
 . On every fixture whose superblock is readable, the probe's feature list
-  equals the "Filesystem features" line of `dumpe2fs -h` at the pinned
-  e2fsprogs, compared as sets of names. Unknown bits are compared in
-  dumpe2fs's own `FEATURE_<x><n>` spelling.
+  equals the "Filesystem features" line of `dumpe2fs -f -h` at the pinned
+  e2fsprogs, compared as sets of names. Record the command, exit status and
+  output, including for `F-FEATURE-UNKNOWN`; `-f` forces display despite
+  unknown incompatibility bits. For `F-SB-PRIMARY`, select the validated backup
+  with `-o superblock=<block> -o blocksize=<size>` for this comparison.
+  Unknown bits are compared in dumpe2fs's own `FEATURE_<x><n>` spelling.
+. For every `F-*` fixture, also compare all three raw feature masks
+  (`compat`, `incompat`, `ro_compat`) with independently recorded expected
+  masks from E1's fixture metadata, using the validated backup for
+  `F-SB-PRIMARY`. Check bit/name pairs against the pinned feature table,
+  including the injected unknown bit; matching names alone cannot pass.
 . `F-FEATURE-UNKNOWN` is reported as an *unknown* feature, and the report
   says that a write would be refused (the W3 rule, exercised read-only).
 . The Atoma check passes on `verified/ext4/` at the pinned commit.
@@ -68,7 +84,8 @@ checks alone cannot see.
   Concretely: copy each clean fixture, flip one byte inside the superblock,
   inside one group descriptor and inside one dx block, recompute nothing, and
   the probe must go red on each.
-* A feature-set mismatch with `dumpe2fs -h` on any fixture.
+* A feature-set mismatch with `dumpe2fs -f -h` on any fixture, or an incorrect
+  `compat`, `incompat` or `ro_compat` raw mask on any `F-*` fixture.
 
 == Mutations — watch it go red
 
@@ -76,6 +93,9 @@ checks alone cannot see.
 * Cap the extent loop one level short: a multi-level extent file in the
   payload must then be reported unreadable.
 * Map one feature bit to the wrong name: the `dumpe2fs` comparison must fail.
+* Flip one bit in a reported raw mask while leaving the feature names
+  unchanged: `just e4` must fail. Run this mutation for each of `compat`,
+  `incompat` and `ro_compat`.
 
 == Out of scope
 
