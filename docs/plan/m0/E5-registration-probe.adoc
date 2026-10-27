@@ -1,0 +1,127 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= E5 — Registration probe (Windows)
+:toc:
+
+[cols="1,4"]
+|===
+| Status | planned
+| Depends on | E6 (where it runs); E1 (`R-ORPHAN-DISK` scenario)
+| Feeds | M1 registration repair; owner's re-registration decision
+| Rulings | P4 (runs last)
+|===
+
+== Goal
+
+Enumerate `HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss\{GUID}` keys,
+match each to its `.vhdx` file, and report:
+
+* *orphans*: a `.vhdx` with no key (the brief's case);
+* *dangling keys*: a key whose `BasePath` / `VhdFileName` names no file.
+  *Departure from the brief:* this is the mirror case, added because it is
+  just as cheap to detect, and M1 needs to tell the two apart.
+
+The probe makes no writes.
+
+== Shape
+
+* `shell/windows/registry.zig` opens keys with `KEY_READ` only and exposes no
+  write function at all, so a write cannot be expressed through it. In M1 the
+  Idris2 side models the same rule with types; here it is an API boundary.
+* `shell/windows/lxss_probe.zig` emits an I-JSON/JCS report with key GUID,
+  `DistributionName`, `BasePath`, `VhdFileName`, `Version`, `Flags`, file
+  present (yes/no), size and sha256 of the first header block (never contents,
+  W5).
+* *Test root parameter:* the probe takes the registry root to scan. Tests use
+  `HKCU\Software\subsystem-warrior-test\Lxss`, so a developer's real WSL
+  registration is never the test bed. CI additionally scans the real `Lxss`
+  path on the disposable runner.
+* *Filesystem search roots:* a registry scan alone finds dangling keys, but
+  it can never find an orphan, because no registry value points at an
+  orphan's path. The probe therefore also takes a bounded list of search roots
+  and lists `*.vhdx` files under them to a fixed depth. Defaults: the parent
+  of every known `BasePath`, `%LOCALAPPDATA%\Packages\*\LocalState\`, and
+  `%LOCALAPPDATA%\wsl\`. Roots passed with `--search-root` are added to these.
+  Any `.vhdx` under a root that no key references is an orphan *candidate*.
+  The report says which root found it. Files outside the roots are reported
+  as "not searched", never as "no orphans" (W7). Tests pass the scenario
+  directory as a search root.
+* *Built by Zig cross-compilation from Linux* (`-Dtarget=x86_64-windows`) and
+  run on the Windows runner. This is the first evidence for the owner's
+  cross-compilation question.
+* Version-1 distros (no `.vhdx`, `rootfs/` on NTFS) are *detected and
+  reported as out of scope*, never probed further (brief §WSL 1).
+
+== Acceptance (exit status decides)
+
+`tests/m0/e5_lxss_test.ps1` exits 0 iff all of the following hold:
+
+. With the `R-ORPHAN-DISK` scenario set up by the harness, the probe
+  reports exactly that orphan.
+. With a dangling-key scenario, it reports exactly that dangling key.
+. With a clean scenario, it reports neither.
+. A WSL1-shaped key is reported as `out-of-scope: wsl1`.
+. The no-write checks below all pass.
+
+== Falsifier: any registry write during probe
+
+Three independent checks, because any one of them can be fooled:
+
+. *Before/after snapshot:* `reg export` of the test root and of the real
+  `Lxss` path before and after the probe, byte-compared.
+. *Static imports:* check the probe's PE imports, including delay imports,
+  with `llvm-objdump` or Zig's own PE reader against a closed registry API
+  allowlist: `RegOpenKeyExW`, `RegEnumKeyExW`, `RegEnumValueW`,
+  `RegQueryInfoKeyW`, `RegQueryValueExW` and `RegCloseKey`. Reject every other
+  registry API, including `RegSetValue*`, `RegSetKeyValue*` (in particular
+  `RegSetKeyValueW`), `RegRenameKey`, `RegCreateKey*`, `RegDelete*`,
+  `RegSaveKey*`, `RegRestoreKey*`, `RegReplaceKey*`, `RegLoadKey*`,
+  `RegUnLoadKey*`, security setters, and native or wrapper mutation APIs.
+  Reject dynamic registry API resolution as well: no runtime library loading
+  or symbol resolution to bypass the allowlist. Check imports and source for
+  `LoadLibrary*`, `GetProcAddress`, `LdrLoadDll`, `LdrGetProcedureAddress` and
+  equivalent resolver paths.
+. *Access mask:* every `RegOpenKeyExW` call site passes `KEY_READ`. This is
+  a source grep in the test, which is crude but fails loudly.
+
+== Mutations — watch it go red
+
+* Add a harmless `RegSetValueExW` call behind a test-only flag: checks 1 and 2
+  must fail.
+* Add imports of `RegSetKeyValueW` and `RegRenameKey` separately, then a
+  dynamic registry resolver: static check 2 must reject each mutation.
+* Open one key with `KEY_ALL_ACCESS`: check 3 must fail.
+* Delete the orphan's `.vhdx` mid-scenario: the orphan becomes neither an
+  orphan nor a dangling key, and the probe must report that, not crash.
+
+== Evidence for the owner's open question
+
+Re-registration (`wsl --import-in-place` vs. recreating the key) is *not*
+decided here. E5 consumes a pre-generated comparison of the values
+`--import-in-place` writes versus an original key, recording its provenance
+and WSL version in the receipt. Any `wsl --import-in-place` execution belongs
+to a separate owner-gated re-registration experiment, outside E5's probe and
+no-write checks. If the comparison is unavailable, record that evidence as
+`not-run`, never generate it during E5. The owner then decides with that diff
+in hand. Note: `wsl --unregister` *deletes the disk* (Microsoft documents that
+all data is lost), so no repair path may
+ever call it. M1 must make that call unrepresentable.
+
+== Aspects
+
+* *Security:* read-only by construction plus three external checks. The
+  report is local only, with no network (W5).
+* *Privacy:* the report contains paths and hashes. Paths include the Windows
+  user name, so M1's report viewer should offer redaction.
+* *Portability:* registry layout differs between Store WSL and inbox WSL.
+  Record both if the runner exposes both.
+
+== Beyond this repo
+
+A read-only `Lxss` enumerator is useful to other estate tooling (inventory,
+audits). Keep its I-JSON report schema stable and documented.
+
+== Receipt
+
+`verification/tests/m0/E5-receipt.adoc` and `.json`, including the URL of the
+workflow run.

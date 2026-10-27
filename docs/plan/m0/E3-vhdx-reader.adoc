@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= E3 — Pure-Zig VHDX reader (Atoma subset)
+:toc:
+
+[cols="1,4"]
+|===
+| Status | planned
+| Depends on | E1, E2; Atoma gates re-run at a pinned commit
+| Feeds | M1 container layer; Atoma milestone S proposal; `zig-vhdx` package idea
+| Rulings | P2 (independent oracle), P7 (torn-header interpretation)
+|===
+
+== Goal
+
+Read a dynamic VHDX — headers, region table, BAT, metadata region — and stream
+its virtual disk as raw bytes. Detect, but do not replay, a pending log. Name
+every container fault by its catalogue id. The parsers are written to the
+Atoma verifiable Zig subset.
+
+== Before any code
+
+. *Pin the spec.* Obtain [MS-VHDX] from Microsoft's Open Specifications and
+  record its revision and date in the receipt. Every struct offset, size and
+  checksum rule in the code cites a section of that revision. Nothing is taken
+  from memory, from qemu's source, or from this brief.
+. *Re-run Atoma.* Clone `hyperpolymath/atoma` read-only at a pinned commit, run
+  its own gates as *Atoma's* `docs/plan/ULTRAPLAN.adoc` §Environment describes
+  (that file is in `hyperpolymath/atoma` at the pinned commit, not in this
+  repository; copy the exact commands run into the receipt), and
+  record the result. The brief read Atoma's status at `8d78985` without
+  re-running it. If the gates are red, E3 stops and reports.
+. *Zig version.* The template's FFI targets Zig 0.15.2+. Atoma needs whatever
+  version it needs. If the pinned Guix channel (P3) cannot supply that
+  version, stop and put the conflict to the owner.
+
+== Shape
+
+* `src/interface/ffi/src/verified/` takes `[]const u8` slices and returns
+  results. No allocator, no I/O, no recursion. Every loop has `@invariant`
+  and `@decreases`. Copy the structure of Atoma's `frame-v1` (a CRC-checked
+  frame parser).
+* `src/interface/ffi/src/shell/vhdx_cat.zig` does the file I/O: it reads
+  regions, hands slices to `verified/`, and writes raw bytes to stdout and a
+  fault report (I-JSON/JCS) to a file. Validate all payload BAT entries before
+  writing any raw bytes, so `C-BAT-BAD` produces no partial raw output.
+* An `m0` step in `build.zig`, so E3 compiles before mint (LAYOUT note 5).
+
+== Torn-header rule (P7)
+
+* *One header torn* (`C-HDR-TORN`): use the valid header and output the data.
+  *Also* emit `C-HDR-TORN` with which copy failed, and the expected and actual
+  CRC.
+* *Both headers torn* (`C-HDR-TORN-BOTH`): no data. Emit the fault, exit
+  nonzero.
+
+== Acceptance (exit status decides)
+
+`just e3` exits 0 iff all of the following hold:
+
+. For every fixture with no *container* fault (`X-CLEAN`, all `F-*`,
+  `K-WSLCONF-BAD`): the reader's raw output is byte-identical to
+  `qemu-img convert -O raw` of the same file (sha256 compared).
+. For every `C-*` fixture whose fault lives in the VHDX bytes
+  (`C-HDR-TORN`, `C-HDR-TORN-BOTH`, `C-LOG-UNREPLAYED`, `C-BAT-BAD`): the
+  fault report names exactly the fixture's declared fault id.
+  `C-HOST-COMPRESSED` is excluded here. Its fault is an NTFS attribute, not
+  a VHDX byte, so E3 (bytes in, no Windows API) cannot see it. It belongs to
+  the Windows probe (E5/E6).
+. For `C-HDR-TORN`: the raw-image sha256 also matches qemu's, and the report
+  includes the failed header identifier plus both stored (expected) and
+  computed (actual) CRC values, checked against E1's independent header-CRC
+  oracle. Missing or incorrect identifiers or CRCs fail acceptance.
+. For `C-HDR-TORN-BOTH`, `C-LOG-UNREPLAYED` and `C-BAT-BAD`: raw stdout is
+  exactly zero bytes, the declared fault is named, and the exit code is
+  nonzero. Partial raw output fails acceptance.
+. Atoma's checker passes on every file under `verified/` at the pinned Atoma
+  commit, and the receipt records the status class (`INCOMPLETE (Warrant)` or
+  whatever Atoma reports then).
+
+== Falsifiers
+
+* Identical output on `C-HDR-TORN` *without* `C-HDR-TORN` named. That means
+  the reader ignored the CRC.
+* Any raw output on `C-HDR-TORN-BOTH`, `C-LOG-UNREPLAYED` or `C-BAT-BAD`.
+* A non-corrupt fixture whose output differs from qemu's.
+
+== Mutations — watch it go red
+
+* Replace the header CRC check with `true`: the `C-HDR-TORN` and
+  `C-HDR-TORN-BOTH` tests must fail.
+* Omit the failed header identifier or either CRC from the torn-header report:
+  the `C-HDR-TORN` test must fail.
+* Emit one raw byte before refusing `C-BAT-BAD`: its zero-output check must
+  fail, even if the fault id and exit status are correct.
+* Off-by-one in the BAT entry-to-offset calculation: the byte-identity checks
+  must fail.
+* Remove one `@invariant`: the Atoma check must fail. If it does not, record
+  that the checker is not looking at that loop.
+* A fuzz pass over the header and region-table parsers (Zig built-in
+  fuzzing, `tests/fuzz/`) with no crashes. This is an add-on, reported
+  separately.
+
+== Out of scope
+
+Log *replay* (M1, container repair), writing VHDX, differencing disks, VHD
+(v1), and any Windows API use.
+
+== Risks and unknowns
+
+* qemu's VHDX driver as oracle: if qemu and [MS-VHDX] disagree on some
+  field, the receipt records both, and the spec wins.
+* The Atoma subset may not cover something VHDX parsing needs (e.g. the BAT's
+  chunk-ratio arithmetic). If so, that piece moves to `shell/`, is marked
+  unverified, and is raised in the Atoma proposal as a gap, not worked around
+  silently.
+
+== Aspects
+
+* *Correctness claim:* "Atoma-checked, Warrant", never "proved" (brief
+  §Atoma).
+* *Security:* the verified layer is the part that touches attacker-shaped
+  bytes, which is exactly why it is the checked part.
+* *Portability:* `verified/` is OS-free, so the same code runs in the Windows
+  executable and in the rescue distro.
+
+== Beyond this repo
+
+* `hyperpolymath/atoma`: issue proposing the VHDX header parser as milestone
+  S's "second worked example", opened by the owner after this receipt is
+  green.
+* `zig-vhdx`: candidate standalone package (the `verified/vhdx` directory plus
+  `crc32c.zig`).
+
+== Receipt
+
+`verification/tests/m0/E3-receipt.adoc` and `.json`.

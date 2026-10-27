@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= subsystem-warrior — proposed directory layout
+:toc:
+
+Status: *proposal*, for approval with the plan PR. Nothing below exists yet
+except where marked _(exists)_.
+
+== Constraints this layout respects
+
+The template's canon fixes most of the shape. The layout below adds no new
+root entry and no new `src/` unit. Every path is a slot the canon already
+names.
+
+* *Root allowlist is bidirectional* (`.machine_readable/root-allow.txt`,
+  `scripts/check-root-shape.sh`): no new root entries. So there is no root
+  `fixtures/`, no root `receipts/`, and no second `Justfile`.
+* *`src/` units* (deed `ply`): core logic in `core/`, verified seams in
+  `interface/`, safety constraints in `contracts/`, failure dictionaries in
+  `errors/`. *ABI MUST be Idris2*, *FFI MUST be Zig*; the "Truth" lives in
+  `interface/Abi/`, the "Implementation" in `interface/ffi/`.
+* *Justfile is thin* and delegates phases to `build/just/*.just` (it already
+  imports `validate`, `proofs`, `container`, …).
+* *Evidence is reproducible and documented* under `verification/`
+  (deed `ply`, verification pillar).
+* *Data formats* (estate route): machine-written records are I-JSON/JCS
+  (`.json`, checked by `scripts/check-ijson-jcs.sh`); estate config is KYAML;
+  Guix files stay Scheme.
+* *Pre-mint compile limit:* `src/interface/ffi/src/main.zig` carries template
+  tokens until `just repo-init`, so the existing `zig build test` step only
+  compiles in a minted repo (`src/interface/ffi/build.zig`, header comment).
+
+== The tree
+
+M0 paths are what the experiment PRs add. M1 paths are reserved here so M0
+does not paint M1 into a corner, but they stay empty in M0.
+
+[literal]
+....
+build/
+  channels.scm                 (exists) Guix pin, reused as the M0 toolchain pin   [P3]
+  manifest.scm                 (exists) + e2fsprogs, qemu, rhash, testdisk, …      [E1, E2]
+  just/m0.just                 recipes: fixtures, fixtures-check, baseline,
+                               e3, e4, e5; imported by the root Justfile            [E1+]
+
+src/
+  errors/
+    faults.json                the fault catalogue: one record per fault id,
+                               layer, oracle, expected verdicts (I-JSON/JCS)        [E1]
+    README.adoc                (exists) gains: how ids are minted and retired
+  interface/
+    ffi/                       (exists) Zig
+      build.zig                (exists) + an `m0` step that builds/tests only the
+                               modules below, so M0 compiles before mint            [E3]
+      src/
+        verified/              Atoma-subset code only: slices in, results out;
+                               no allocator, no I/O, no recursion, no callbacks
+          crc32c.zig                                                                [E3]
+          vhdx/                header, region table, BAT, metadata, log detect      [E3]
+          ext4/                superblock, features, group descriptors,
+                               inode, extent (bounded), dirblock/htree             [E4]
+        shell/                 unverified: file I/O, CLI, report emission
+          vhdx_cat.zig         E3 driver: VHDX → raw on stdout + fault report       [E3]
+          ext4_probe.zig       E4 driver                                            [E4]
+          windows/
+            registry.zig       read-only Lxss enumeration (KEY_READ only)           [E5]
+            lxss_probe.zig     E5 driver                                            [E5]
+    Abi/                       (exists) Idris2: Probe/Rescue/Repair result types,
+                               FaultId, Layer                                       [M1]
+  core/                        Idris2: five-layer model, W2 state machine,
+                               W1 Original/WorkingCopy as an affine resource        [M1]
+  contracts/                   W1–W7 as checked contracts                           [M1]
+  bridges/wsl/                 backend 1: the WSL bindings of the five layers       [M1]
+  definitions/                 backend descriptors (wsl, later docker-desktop, …)  [M1]
+
+tests/
+  fixtures/wsl/
+    gen/                       Zig: normaliser (GUID pin + checksum recompute) and
+                               fault injectors. Deliberately shares NO code with
+                               src/interface/ffi (independence; see note 2)         [E1]
+    payload.json               the deterministic file tree written into every
+                               ext4 fixture: names, sizes, seed, sha256             [E1]
+    manifests/<id>.json        one per fixture: fault id, sha256, tool versions,
+                               Guix channel commit, oracle verdict                  [E1]
+    out/                       generated binaries (git-ignored; `just fixtures`)    [E1]
+  m0/
+    e1_fixtures_test.sh        acceptance + falsifier + mutation, per card          [E1]
+    e2_baseline.sh                                                                  [E2]
+    e3_vhdx_test.sh                                                                 [E3]
+    e4_ext4_test.sh                                                                 [E4]
+    e5_lxss_test.ps1           runs on Windows only                                 [E5]
+
+verification/
+  tests/m0/
+    E<n>-receipt.adoc          human receipt: commands, exit codes, falsifiers run,
+                               mutations that went red, tool versions               [each]
+    E<n>-receipt.json          the same as I-JSON/JCS, for gates and later W6 use   [each]
+  traceability/
+    m0-matrix.adoc             W1–W7 and every fault id → the test that covers it   [E1+]
+
+.github/workflows/
+  m0-fixtures.yml              Linux: guix time-machine; regenerate + compare       [E1]
+  m0-windows-probe.yml         Windows: PowerShell steps only, no third-party
+                               actions (actions.lock / pinning gate stays happy)    [E6, E5]
+
+docs/plan/                     this plan (P1; deed registration pending, P5)
+....
+
+== Notes on the less obvious choices
+
+. *Verified vs. shell is a directory boundary, not a convention.* Atoma cannot
+  yet check allocators, recursion, callbacks, threads, `@cImport` or ambient
+  I/O (brief §Atoma). Putting everything Atoma checks under `verified/` lets a
+  gate say "every file here is in the subset" and lets `zig-vhdx` /
+  `zig-ext4-ro` be lifted out later as whole directories. Parsers are described
+  as "Atoma-checked, Warrant", never "proved".
+. *The fixture generator does not reuse the reader's code.* `tests/fixtures/wsl/gen`
+  writes VHDX/ext4 structures, and `src/interface/ffi/src/verified` reads them.
+  If they shared a CRC or struct module, a shared misreading of [MS-VHDX] would
+  pass both sides silently. The duplication is the price of an independent
+  check. qemu-img and e2fsprogs remain the third-party oracles.
+. *Fault ids live in `src/errors/faults.json`.* Fixture manifests, reader
+  output, E2's baseline table and (in M1) W6 reports all name faults by the
+  same id, so a single join answers "which fixture, which detector, which
+  cost".
+. *Zig parsers sit in `interface/ffi/`, not `core/`.* The canon reserves
+  `core/` for core logic and says FFI MUST be Zig. Brief §Languages puts
+  binary parsing in Zig and the state machine in Idris2. So the Idris2 model
+  goes to `core/`, and the Zig parsers are the implementation side of the
+  seam whose types will live in `Abi/`.
+. *A separate `m0` build step* lets E3/E4 compile and test before mint, without
+  touching the template's `main.zig`. If the owner mints before E3 starts, the
+  step can fold into `zig build test`.
+. *Receipts live under `verification/tests/m0/`, not `docs/reports/`.*
+  `docs/reports/` canon covers audit, compliance, maintenance, performance,
+  quality and security reports. Experiment evidence is what the verification
+  pillar is for.
+
+== Not decided by this layout
+
+* Where the rescue distro image is built (likely `build/container/`, using the
+  existing stapeln + Containerfile scaffolding) — waits on the owner's base
+  choice (Alpine vs. Wolfi).
+* The Windows executable's build entry point — waits on E6 and on the
+  cross-compilation question.

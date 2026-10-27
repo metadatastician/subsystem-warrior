@@ -1,0 +1,139 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= E6 — Windows CI feasibility
+:toc:
+
+[cols="1,4"]
+|===
+| Status | planned
+| Depends on | nothing (runs first, in parallel with E1)
+| Feeds | where E5 and the Windows-only fixtures run; M1 test bed; owner's cross-compilation question
+| Rulings | P4 (runs first)
+|===
+
+== Goal
+
+Answer, *with a workflow run*, whether GitHub-hosted Windows runners can:
+
+. run a WSL2 distro;
+. `wsl --mount <vhdx> --vhd --bare` a disk into it;
+. see that disk as a block device inside the distro (`lsblk`) and run
+  `e2fsck -fn` on it.
+
+== Hypothesis, not answer
+
+Community reports suggest standard hosted runners lack the nested
+virtualisation WSL2 needs, while WSL1 works. That is *hypothesis H0*, stated
+so the run can refute it. Assuming either answer without a run is this card's
+falsifier.
+
+== Method
+
+* New workflow `.github/workflows/m0-windows-probe.yml`, `workflow_dispatch`
+  plus pull requests touching it. Matrix: `windows-2022`, `windows-2025`
+  (record the image versions the run reports).
+* *PowerShell steps only, no third-party actions.* That keeps the evidence
+  free of an action's hidden setup. If `actions/checkout` is needed, use the
+  pinned SHA already in `actions.lock`. It does *not* leave `actions.lock`
+  unchanged: `scripts/check-lock-sync.sh` clause 4 needs a key for every
+  workflow file, including one with no `uses:` (whose value is `[]`). The
+  E6 PR regenerates the lockfile with the repo's tooling
+  (`gh actions-lock`, as the lock-sync gate's own message says), never by
+  hand, and runs `scripts/check-lock-sync.sh` before pushing.
+* Each step records a ternary verdict, `yes` / `no` / `not-run: <reason>`,
+  into an I-JSON/JCS artefact:
+  .. `systeminfo` / `Get-ComputerInfo` Hyper-V and virtualisation fields;
+  .. `wsl --version`, `wsl --status`;
+  .. `wsl --install --no-distribution` if WSL is absent (record reboot
+     needs; a needed reboot is a `no` for hosted CI);
+  .. import a tiny rootfs with `wsl --import … --version 2`. The rootfs is
+     pinned by sha256 and fetched over HTTPS; network use in CI is outside
+     W5, which binds the tool;
+  .. `wsl -d <name> -- uname -a` and `wsl -d <name> -- cat /proc/version`
+     (WSL2 kernel or not);
+  .. capture `wsl -d <name> -- lsblk --json --bytes -o NAME,PATH,TYPE,SIZE,UUID`
+     before and after `wsl --mount <X-CLEAN.vhdx> --vhd --bare`. Select a
+     newly appeared disk by the before/after difference and its expected
+     virtual size and filesystem UUID from the fixture metadata. Record the
+     snapshots and selected device path; require exactly one matching device,
+     never assume a name such as `/dev/sdc`;
+  .. run `wsl -d <name> -- e2fsck -fn <verified-device>` only on that verified
+     device. If identification fails or is ambiguous, record `no` with the
+     evidence and do not run e2fsck on any device;
+  .. fallback probe: the same import with `--version 1`, to bound what *is*
+     available.
+* The `.vhdx` for the mount steps is `X-CLEAN` from E1 if E1 has landed;
+  otherwise a one-off `qemu-img` image made in a Linux job and passed as an
+  artefact. The receipt records which, plus its expected virtual size and
+  filesystem UUID for device identification.
+* *Cross-compilation smoke test:* a Linux job builds a trivial Zig
+  `x86_64-windows` executable, and the Windows job runs it. This answers the
+  smallest form of the owner's question.
+
+== Acceptance (exit status decides)
+
+The workflow exits 0 iff every required step, including the cross-compilation
+smoke test, produced a recorded verdict of `yes` or `no` with evidence. Any
+missing verdict or `not-run: <reason>` makes E6 incomplete and exits nonzero.
+`no` remains a valid recorded feasibility result: "WSL2 does not work" is a
+*successful* E6 outcome when all required steps have a supported verdict.
+The receipt then states the answer and its consequences. A failed prerequisite
+may support `no` for a dependent capability only when the receipt records that
+causal evidence; an unattempted step without such evidence remains `not-run`.
+
+== Falsifiers
+
+* Concluding yes or no without a run URL in the receipt.
+* A step with no recorded verdict.
+* A zero exit status while any required step is `not-run`.
+* Reading a step's success from its exit code alone, where `wsl.exe` is known
+  to print errors in UTF-16 and may exit 0. Each step also checks its output.
+
+== Mutations — watch it go red
+
+* Point the mount step at a nonexistent path: that step must record `no`
+  with the error, not `yes`.
+* Remove one step's verdict write: the completeness check must fail the
+  workflow.
+* Replace a required step's verdict with `not-run: <reason>`: the workflow
+  must exit nonzero and mark E6 incomplete.
+
+== Consequences of each answer
+
+[cols="1,3",options="header"]
+|===
+| Answer | Then
+
+| WSL2 + bare mount work
+| E5 and the Windows-only fixtures run on hosted runners. M1's end-to-end
+  tests can run in CI.
+
+| WSL1 only
+| E5 still runs (it needs only the registry and the filesystem). End-to-end
+  WSL2 tests need another host. Options for the owner, all beyond this repo: a
+  self-hosted Windows runner, a cloud VM with nested virtualisation, or a
+  larger runner type if GitHub offers one with it.
+
+| No WSL at all
+| As above, and `C-HOST-COMPRESSED` must be built on an owner machine and
+  committed as a signed scenario recipe.
+|===
+
+== Aspects
+
+* *Security:* no secrets are needed, and the workflow requests read-only
+  `permissions:`. The runner is disposable, so registry and WSL changes there
+  are harmless and are never repeated on a developer machine.
+* *Cost:* Windows minutes bill at a multiple of Linux minutes. Keep the
+  matrix to two images and dispatch-only after the first answer.
+* *Honesty:* both "yes" and "no" are green outcomes. Only "unknown" is red.
+
+== Beyond this repo
+
+The answer is estate knowledge: any estate repo wanting Windows/WSL CI hits
+the same wall. Record it where `standards` keeps CI platform notes.
+
+== Receipt
+
+`verification/tests/m0/E6-receipt.adoc` and `.json`, with the run URL(s) and
+the runner image versions.
