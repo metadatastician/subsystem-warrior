@@ -32,10 +32,14 @@ falsifier.
 * New workflow `.github/workflows/m0-windows-probe.yml`, `workflow_dispatch`
   plus pull requests touching it. Matrix: `windows-2022`, `windows-2025`
   (record the image versions the run reports).
-* *PowerShell steps only, no third-party actions.* That keeps the
-  action-pinning gate and `actions.lock` unchanged, and keeps the evidence
+* *PowerShell steps only, no third-party actions.* That keeps the evidence
   free of an action's hidden setup. If `actions/checkout` is needed, use the
-  pinned SHA already in `actions.lock`.
+  pinned SHA already in `actions.lock`. It does *not* leave `actions.lock`
+  unchanged: `scripts/check-lock-sync.sh` clause 4 needs a key for every
+  workflow file, including one with no `uses:` (whose value is `[]`). The
+  E6 PR regenerates the lockfile with the repo's tooling
+  (`gh actions-lock`, as the lock-sync gate's own message says), never by
+  hand, and runs `scripts/check-lock-sync.sh` before pushing.
 * Each step records a ternary verdict, `yes` / `no` / `not-run: <reason>`,
   into an I-JSON/JCS artefact:
   .. `systeminfo` / `Get-ComputerInfo` Hyper-V and virtualisation fields;

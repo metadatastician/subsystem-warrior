@@ -69,6 +69,31 @@ Each card cites the ruling it depends on.
   ROADMAP from this file.
 |===
 
+=== Changes after review (2026-10-27)
+
+Codex and CodeRabbit reviewed the cards. Every finding was checked against
+the text and the repo's own scripts before any change.
+
+* CodeRabbit's autofix tightened the E1–E6 acceptance criteria (commit
+  `e0ca4d1`) and added `tests/workflows/wsl_plan_test.sh` (commit `5e15ba4`).
+  Both were kept by owner ruling.
+* CodeRabbit's CI-fix bot renamed the deed and bumped the canon pin to
+  make `Canon lockstep` pass (commit `49d63e2`). That is a partial mint
+  outside `just repo-init`, so it was *reverted* by owner ruling. Minting
+  stays owner-only.
+* Codex findings applied to the cards:
+  ** E1 keeps a zero LogGuid, which means "no log".
+  ** E1 GUIDs are deterministic UUIDv8 per ADR-008, not UUIDv5.
+  ** E1 requires a payload file with extent depth ≥ 1.
+  ** E2 runs `e2fsck -b` non-interactively.
+  ** E3 points `ULTRAPLAN` at Atoma and leaves `C-HOST-COMPRESSED` to the
+     Windows probe.
+  ** E5 gets filesystem search roots, so it can find orphans at all.
+  ** E6 regenerates `actions.lock`.
+* *Departure from the brief:* new fixture `F-FEATURE-SKEW` (a real ext4
+  feature that is newer than an older pinned e2fsprogs), so that M0 exercises
+  W3's version comparison and not only the unknown-bit refusal. See E1.
+
 [[sequence]]
 == Sequence
 

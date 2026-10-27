@@ -36,6 +36,16 @@ The probe makes no writes.
   `HKCU\Software\subsystem-warrior-test\Lxss`, so a developer's real WSL
   registration is never the test bed. CI additionally scans the real `Lxss`
   path on the disposable runner.
+* *Filesystem search roots:* a registry scan alone finds dangling keys, but
+  it can never find an orphan, because no registry value points at an
+  orphan's path. The probe therefore also takes a bounded list of search roots
+  and lists `*.vhdx` files under them to a fixed depth. Defaults: the parent
+  of every known `BasePath`, `%LOCALAPPDATA%\Packages\*\LocalState\`, and
+  `%LOCALAPPDATA%\wsl\`. Roots passed with `--search-root` are added to these.
+  Any `.vhdx` under a root that no key references is an orphan *candidate*.
+  The report says which root found it. Files outside the roots are reported
+  as "not searched", never as "no orphans" (W7). Tests pass the scenario
+  directory as a search root.
 * *Built by Zig cross-compilation from Linux* (`-Dtarget=x86_64-windows`) and
   run on the Windows runner. This is the first evidence for the owner's
   cross-compilation question.

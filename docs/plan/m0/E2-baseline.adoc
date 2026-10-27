@@ -35,7 +35,10 @@ comes back. Later work is judged against this table.
   ** `qemu-img info`, `qemu-img check`, then `qemu-img check -r all` on a copy
      when check reports something repairable, then `qemu-img convert -O raw`;
   ** on the raw image: `e2fsck -fn`; if that reports a fault, `e2fsck -fy`
-     on a copy; if the primary superblock is unusable, `e2fsck -b <backup>`;
+     on a copy; if the primary superblock is unusable, `e2fsck -fn -b <backup>`
+     for the diagnosis and `e2fsck -fy -b <backup>` on a copy for the repair.
+     Every `e2fsck` call carries `-n` or `-y`, so none can stop at an
+     interactive prompt;
   ** `debugfs -c -R "rdump / <out>"` (catastrophic mode, read-only);
   ** `testdisk /list` and, where it finds the filesystem, its file listing.
 . Score recovery against `payload.json`: files intact (sha256 match), files

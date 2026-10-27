@@ -90,8 +90,15 @@ checks alone cannot see.
 == Mutations — watch it go red
 
 * Skip the superblock checksum: the falsifier above must fail.
-* Cap the extent loop one level short: a multi-level extent file in the
-  payload must then be reported unreadable.
+* Cap the extent loop one level short: the payload's depth ≥ 1 sparse file
+  (required by E1, with its depth recorded in the manifest) must then be
+  reported unreadable. If no payload file has depth ≥ 1, this mutation
+  proves nothing, so the test fails instead of passing vacuously.
+* `F-FEATURE-SKEW`: the probe looks `orphan_file` up in the feature table,
+  compares its minimum e2fsprogs version with a configured "rescue tool"
+  version, and must report "write would be refused" for the older oracle
+  version and "allowed" for the pinned one. Swap the comparison operator:
+  both cases must fail.
 * Map one feature bit to the wrong name: the `dumpe2fs` comparison must fail.
 * Flip one bit in a reported raw mask while leaving the feature names
   unchanged: `just e4` must fail. Run this mutation for each of `compat`,

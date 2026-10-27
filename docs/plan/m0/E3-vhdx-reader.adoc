@@ -25,7 +25,9 @@ Atoma verifiable Zig subset.
   checksum rule in the code cites a section of that revision. Nothing is taken
   from memory, from qemu's source, or from this brief.
 . *Re-run Atoma.* Clone `hyperpolymath/atoma` read-only at a pinned commit, run
-  its own gates as `docs/plan/ULTRAPLAN.adoc` §Environment describes, and
+  its own gates as *Atoma's* `docs/plan/ULTRAPLAN.adoc` §Environment describes
+  (that file is in `hyperpolymath/atoma` at the pinned commit, not in this
+  repository; copy the exact commands run into the receipt), and
   record the result. The brief read Atoma's status at `8d78985` without
   re-running it. If the gates are red, E3 stops and reports.
 . *Zig version.* The template's FFI targets Zig 0.15.2+. Atoma needs whatever
@@ -59,8 +61,12 @@ Atoma verifiable Zig subset.
 . For every fixture with no *container* fault (`X-CLEAN`, all `F-*`,
   `K-WSLCONF-BAD`): the reader's raw output is byte-identical to
   `qemu-img convert -O raw` of the same file (sha256 compared).
-. For every `C-*` fixture: the fault report names exactly the fixture's
-  declared fault id.
+. For every `C-*` fixture whose fault lives in the VHDX bytes
+  (`C-HDR-TORN`, `C-HDR-TORN-BOTH`, `C-LOG-UNREPLAYED`, `C-BAT-BAD`): the
+  fault report names exactly the fixture's declared fault id.
+  `C-HOST-COMPRESSED` is excluded here. Its fault is an NTFS attribute, not
+  a VHDX byte, so E3 (bytes in, no Windows API) cannot see it. It belongs to
+  the Windows probe (E5/E6).
 . For `C-HDR-TORN`: the raw-image sha256 also matches qemu's, and the report
   includes the failed header identifier plus both stored (expected) and
   computed (actual) CRC values, checked against E1's independent header-CRC

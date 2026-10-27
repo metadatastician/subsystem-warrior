@@ -90,10 +90,30 @@ Ids are `<layer>-<name>`. Layer letters: `R` registration, `C` container,
 | n/a on Linux; checked by E5
 |===
 
-`F-FEATURE-UNKNOWN` uses an *undefined* bit, so it is newer than any tool. A
-second variant using a *real* feature that the rescue distro's e2fsprogs lacks
-(e.g. `orphan_file` against e2fsprogs < 1.47) becomes possible once the owner
-picks the rescue base. Until then it is noted, not built.
+`F-FEATURE-UNKNOWN` uses an *undefined* bit, so it is newer than any tool. On
+its own it tests only "unknown bit → refuse". It does not test W3's real
+case: a *known, valid* feature that is newer than the rescue tool. So M0 adds:
+
+[cols="2,1,4,3",options="header"]
+|===
+| Id | Built on | Injected fault | Expected oracle verdict
+
+| `F-FEATURE-SKEW`
+| Linux
+| a clean ext4 made with `orphan_file` enabled. This is a real feature, and
+  e2fsprogs 1.47.0 supports it (observed 2026-10-27: `mkfs.ext4 -O orphan_file`
+  and a clean `e2fsck -fn`, rc 0). It is not corrupt; it is newer than an
+  older tool.
+| the pinned e2fsprogs accepts it, and an *older* pinned e2fsprogs (< 1.47,
+  from a second Guix channel pin used only as an oracle) refuses it
+|===
+
+*Departure from the brief:* `F-FEATURE-SKEW` is not in the brief's fixture
+list. It is added because without it M0 can go green with no evidence for
+the W3 version-comparison logic. Its "fault" is relative to a tool version,
+so its manifest names the comparison pair (feature, minimum e2fsprogs
+version, older oracle version). The first e2fsprogs version for each feature
+must come from e2fsprogs' release notes and be cited, not taken from memory.
 
 == Method
 
@@ -107,6 +127,13 @@ picks the rescue base. Until then it is noted, not built.
      (`dir_index`), because `F-HTREE` needs one;
   ** files of mixed sizes (inline, single-extent, multi-extent) with
      seeded-PRNG content;
+  ** at least one sparse file with more than four separate data runs, so
+     its extent tree has depth ≥ 1. A contiguous multi-extent file can stay
+     at depth 0. *Already observed* (2026-10-27, e2fsprogs 1.47.0, `mke2fs -d`):
+     six 4 KiB runs 32 blocks apart gave depth 1, and a contiguous 3 MB file
+     gave depth 0. Record each payload file's depth (`debugfs -R 'ex <path>'`)
+     in the manifest. `fixtures-check` fails if no depth ≥ 1 file exists;
+     E4's extent mutation depends on it;
   ** a valid `/etc/wsl.conf`.
   E2 measures recovery against this tree's sha256 list.
 . *ext4 determinism.* Run `mke2fs` with fixed `-U`, `-E hash_seed=…,root_owner=0:0`
@@ -116,9 +143,16 @@ picks the rescue base. Until then it is noted, not built.
   step 1 of the PR establishes them.
 . *VHDX.* Convert with `qemu-img convert -O vhdx -o subformat=dynamic,block_size=<explicit>`.
   Then the Zig normaliser (`tests/fixtures/wsl/gen`) rewrites every
-  GUID — FileWriteGuid, DataWriteGuid, LogGuid, Page83 and any other random
-  field found — to `uuid5(fixture-id, field-name)`, and recomputes every
-  checksum covering an edited byte.
+  random GUID — FileWriteGuid, DataWriteGuid, Page83 and any other random
+  field found — to a *deterministic UUIDv8* derived from (fixture id, field
+  name) in the standards ADR-008 layout (owner ruling D305), and recomputes
+  every checksum covering an edited byte. Read the layout from ADR-008 before
+  writing the normaliser; do not use UUIDv5.
+  *LogGuid is special:* [MS-VHDX] uses an all-zero LogGuid to mean "no valid
+  log". The normaliser preserves a zero LogGuid. It sets a non-zero LogGuid
+  only while building `C-LOG-UNREPLAYED`, together with the matching log
+  entries. A non-zero LogGuid with no entries would turn every clean fixture
+  into a corrupt one before any fault is injected.
 . *Faults.* Apply each fault after normalisation. Recompute every checksum
   except the one the fault is about, so the image carries exactly one fault.
   For `C-HDR-TORN`, independently check both 4 KiB headers with their checksum
