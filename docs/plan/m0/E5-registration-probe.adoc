@@ -6,7 +6,7 @@
 [cols="1,4"]
 |===
 | Status | planned
-| Depends on | E6 (where it runs); E1 (`R-ORPHAN-DISK` scenario)
+| Depends on | E6 (where it runs); E1-W (builds and verifies the `R-ORPHAN-DISK` scenario)
 | Feeds | M1 registration repair; owner's re-registration decision
 | Rulings | P4 (runs last)
 |===
@@ -44,8 +44,13 @@ The probe makes no writes.
   `%LOCALAPPDATA%\wsl\`. Roots passed with `--search-root` are added to these.
   Any `.vhdx` under a root that no key references is an orphan *candidate*.
   The report says which root found it. Files outside the roots are reported
-  as "not searched", never as "no orphans" (W7). Tests pass the scenario
-  directory as a search root.
+  as "not searched", never as "no orphans" (W7). Tests run with
+  `--no-default-roots --search-root <scenario dir>` against the test registry
+  root. A developer's real `%LOCALAPPDATA%` disks therefore never show up as
+  extra orphans in a test, and the isolation stays real. The scan of the
+  real registry path plus the default roots runs as a separate CI step on the
+  disposable runner. Mutation: drop `--no-default-roots` in the clean
+  scenario on a runner that has a real WSL disk, and the clean test must fail.
 * *Built by Zig cross-compilation from Linux* (`-Dtarget=x86_64-windows`) and
   run on the Windows runner. This is the first evidence for the owner's
   cross-compilation question.

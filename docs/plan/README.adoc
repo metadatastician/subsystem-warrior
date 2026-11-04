@@ -20,6 +20,10 @@ This directory holds the plan for the WSL backend of subsystem-warrior. It is a
 
 | link:m0/E1-fixtures.adoc[m0/E1] … link:m0/E6-windows-ci.adoc[m0/E6]
 | One task card per Milestone 0 experiment.
+
+| link:UPSTREAM-DRAFTS.adoc[UPSTREAM-DRAFTS.adoc]
+| Issue drafts for work that belongs in other repositories (U1–U5). None
+  have been filed; filing is the owner's call.
 |===
 
 == Owner rulings taken for this plan (2026-10-27)
@@ -90,6 +94,14 @@ the text and the repo's own scripts before any change.
      Windows probe.
   ** E5 gets filesystem search roots, so it can find orphans at all.
   ** E6 regenerates `actions.lock`.
+* Codex's review of the final head (`9b2db8c`) arrived after the merge. Its
+  five findings are applied in the follow-up PR:
+  ** E1 builds the htree explicitly with `e2fsck -fyD`, with `E2FSCK_TIME`
+     pinned (verified; `mke2fs -d` alone left the directory unindexed).
+  ** E1 splits into E1-L and E1-W, which breaks the E1↔E5 fixture cycle.
+  ** E5 tests run with `--no-default-roots`.
+  ** In E6, harness or input failures count as `incomplete`, never `no`.
+  ** `tests/workflows/wsl_plan_test.sh` is wired into `estate-rules.yml`.
 * *Departure from the brief:* new fixture `F-FEATURE-SKEW` (a real ext4
   feature that is newer than an older pinned e2fsprogs), so that M0 exercises
   W3's version comparison and not only the unknown-bit refusal. See E1.
@@ -99,15 +111,19 @@ the text and the repo's own scripts before any change.
 
 [literal]
 ....
-  E6 (Windows CI feasibility) ─────────────────────────────────┐
+  E6 (Windows CI feasibility) ─► E1-W (Windows scenarios) ─────┐
                                                                ├─► E5 (registration probe)
-  E1 (fixtures) ─► E2 (baseline) ─┬─► E3 (VHDX reader) ──┐     │
-                                  └─► E4 (ext4 probe) ───┴─────┘
+  E1-L (Linux fixtures) ─► E2 (baseline) ─┬─► E3 (VHDX) ──┐    │
+                                          └─► E4 (ext4) ──┴────┘
 ....
 
 * E6 is a cheap, independent probe. Its answer decides where the Windows-only
   fixtures (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`) are built and where E5 runs,
-  so it runs first, in parallel with E1.
+  so it runs first, in parallel with E1-L.
+* E1 has two parts. E1-L builds the Linux fixtures. E1-W is E1's own Windows
+  scenario builder, which runs on E6's runner. E5 only *consumes* E1-W's
+  scenarios, so no fixture depends on the probe that tests it (a Codex review
+  finding removed an E1↔E5 cycle).
 * E3 and E4 are independent parsers over E1's fixtures. E2 comes before them
   so the parsers are measured against a recorded baseline.
 * E5 is last. Note that E5 reads the registry and the filesystem only. It does
@@ -150,6 +166,9 @@ From the brief, plus what this plan adds:
   <<upstream>>.
 * Capturing and signing a real WSL-made `ext4.vhdx` as a golden reference, if
   ever wanted (P2 alternative; not in M0).
+* Turning off CodeQL *default setup* in repository settings (owner ruling
+  2026-10-27). Until then `analyze (actions, none)` stays red. See U4.
+* Filing the upstream drafts U1–U4 in link:UPSTREAM-DRAFTS.adoc[UPSTREAM-DRAFTS.adoc].
 
 [[upstream]]
 == Work that belongs beyond this repository
