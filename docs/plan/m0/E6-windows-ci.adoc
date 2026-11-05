@@ -81,6 +81,20 @@ The receipt then states the answer and its consequences. A failed prerequisite
 may support `no` for a dependent capability only when the receipt records that
 causal evidence; an unattempted step without such evidence remains `not-run`.
 
+*A `no` counts only after the harness has proved its own inputs.* Before any
+capability step, the workflow verifies:
+
+* the fixture's sha256 against its E1 manifest;
+* that the rootfs tarball's sha256 matches its pin;
+* that the cross-compiled executable exists and its hash matches the Linux
+  job's artefact;
+* that every command line it will run has been rendered and logged.
+
+If any of these fails, the result is `incomplete: harness`, which exits
+nonzero, and is never a `no`. Otherwise a missing or corrupt fixture, a
+broken command or a failed cross-compile would be reported as "the hosted
+runner lacks the capability" without any valid probe having run.
+
 == Falsifiers
 
 * Concluding yes or no without a run URL in the receipt.
@@ -91,8 +105,11 @@ causal evidence; an unattempted step without such evidence remains `not-run`.
 
 == Mutations — watch it go red
 
-* Point the mount step at a nonexistent path: that step must record `no`
-  with the error, not `yes`.
+* Point the mount step at a nonexistent path: the input check must classify
+  it as `incomplete: harness` and the workflow must exit nonzero. It must not
+  record `no`, and it must not record `yes`.
+* Corrupt one byte of the fixture: the sha256 precondition must fail the run
+  as `incomplete: harness` before any `wsl --mount`.
 * Remove one step's verdict write: the completeness check must fail the
   workflow.
 * Replace a required step's verdict with `not-run: <reason>`: the workflow

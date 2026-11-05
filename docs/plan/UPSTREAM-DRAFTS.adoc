@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= subsystem-warrior — drafts for work beyond this repository
+:toc:
+
+Issue drafts for the owner to open (or discard). Nothing here has been filed:
+filing is outward-facing and owner-only. Each draft says where it belongs,
+why, and what "done" looks like. They arose while writing and reviewing the
+plan PR (2026-10-27).
+
+== U1 — `rsr-template-repo`: address deed clauses by `:id`
+
+*Where:* `hyperpolymath/rsr-template-repo`, `scripts/deed-field.sh` and
+`scripts/deed-clause.sh`. Every minted repo inherits the fix.
+
+*Problem:* a PATH segment selects the *first* child clause of that name.
+Sibling `(directory …)` clauses in `(ply …)` after the first therefore cannot
+be read or written by the one writer. Example: the `docs-pillar` clause's
+`canonical-locations`. subsystem-warrior needs to register `docs/plan/`
+there (plan ruling P5) and cannot without a hand edit, which the deed forbids.
+
+*Proposal:* accept a selector `name[id]` in PATH that matches `:id "<id>"`,
+e.g. `ply/directory[docs-pillar]/canonical-locations`. Keep the existing
+first-match behaviour when no selector is given.
+
+*Done when:* `deed-clause.sh set DEED ply/directory[docs-pillar]/canonical-locations plan '"plan/"'`
+works, the result re-reads with `deed-field.sh`, and `tests/workflows/deed_clause_test.sh`
+covers a selector hit, a selector miss (exit 1) and the old behaviour.
+
+== U2 — `rsr-template-repo`: canon pin 2.1.2 → 2.1.3?
+
+*Where:* `hyperpolymath/rsr-template-repo` deed `(canon …)` clause first,
+then `standards` (order `spine-adopts-then-canon-releases`).
+
+*Evidence:* CodeRabbit's CI-fix bot changed this repo's pin to
+`:version "2.1.3"` with gates hash
+`2f31f46d4753432e0aa8c9c28f339e18e062c98dc6e6ef4ecbb76993cf37638b`
+(commit `49d63e2`, reverted here). That suggests `standards` canon.lock may now
+be at 2.1.3. This is not verified: no `standards` checkout was read.
+
+*Done when:* the template adopts the current canon at source, and minted repos
+pick it up through the template update mechanism (ADR-0003), not by hand.
+
+== U3 — `rsr-template-repo`: keep review bots out of identity files
+
+*Where:* `hyperpolymath/rsr-template-repo`, `.coderabbit.yaml` (every minted
+repo inherits it).
+
+*Problem:* CodeRabbit's "fix CI failures" finishing touch pushed a commit that
+renamed the deed, bumped the canon pin, and hand-edited the generated
+`CLAUDE.md`, `ROADMAP.adoc` and `root-allow.txt` to turn `Canon lockstep`
+green on an unminted repo. That is a partial mint by a bot (doctrine 5:
+satisfy the gate, do not bypass it; doctrine 11: stop-first).
+
+*Proposal:* configure CodeRabbit so that its autofix, CI-fix and unit-test
+agents never edit `*_chora.deed`, `CLAUDE.md`, `.machine_readable/**`,
+`docs/status/ROADMAP.adoc` or `.github/rulesets/**`, or disable the CI-fix
+finishing touch estate-wide. The exact keys must be checked against
+CodeRabbit's schema v2. This session could not reach `coderabbit.ai` to read
+it, so no key names are given here.
+
+*Done when:* a CI-fix run on a test PR with a red `Canon lockstep` makes no
+change to those paths.
+
+== U4 — estate: CodeQL default setup vs. the template's `codeql.yml`
+
+*Where:* every repo minted from `rsr-template-repo` (settings), plus a note in
+the template's mint checklist.
+
+*Problem:* with CodeQL *default setup* enabled in repository settings, the
+template's advanced `.github/workflows/codeql.yml` fails on upload: "CodeQL
+analyses from advanced configurations cannot be processed when the default
+setup is enabled". The owner ruled (2026-10-27) to disable default setup and
+keep the template workflow.
+
+*Done when:* `just repo-init` (or its checklist) tells the owner to turn
+default setup off, and an estate sweep confirms no minted repo has both.
+
+== U5 — later (kept from the plan README)
+
+* `hyperpolymath/atoma`: offer the VHDX header parser as milestone S's second
+  worked example, after E3's receipt is green.
+* Estate packages `zig-vhdx` and `zig-ext4-ro`, after E3 / E4.
+* `standards`: a shared pinned-fixture-toolchain recipe (P3), and whether
+  `plan/` should be a canonical docs location estate-wide.
+* Later backends: Docker Desktop / Rancher Desktop / Podman machine, Lima /
+  Colima, ChromeOS Crostini.
