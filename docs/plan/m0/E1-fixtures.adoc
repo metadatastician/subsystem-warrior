@@ -56,7 +56,7 @@ Ids are `<layer>-<name>`. Layer letters: `R` registration, `C` container,
 | `qemu-img check` reports an error (to confirm)
 
 | `C-HOST-COMPRESSED`
-| Windows (E6)
+| Windows (E1-W, on E6's runner)
 | a clean `.vhdx` with the NTFS compression attribute set
 | `compact /q` reports compressed. WSL attach fails "Access is denied" (to confirm)
 
@@ -85,7 +85,7 @@ Ids are `<layer>-<name>`. Layer letters: `R` registration, `C` container,
   parses the file and finds the bad key
 
 | `R-ORPHAN-DISK`
-| Windows (E5/E6)
+| Windows (E1-W, on E6's runner)
 | a `.vhdx` on disk with no `Lxss` key referring to it. Shipped as a `.reg`
   scenario plus disk path. E1's own Windows scenario builder creates and
   verifies it (part E1-W, below); E5 only consumes it.

@@ -102,6 +102,13 @@ the text and the repo's own scripts before any change.
   ** E5 tests run with `--no-default-roots`.
   ** In E6, harness or input failures count as `incomplete`, never `no`.
   ** `tests/workflows/wsl_plan_test.sh` is wired into `estate-rules.yml`.
+* Codex's review of `#3` again arrived after its merge. Its four distinct
+  findings are applied in a second follow-up:
+  ** The E1 catalogue now names E1-W as the builder of both Windows scenarios.
+  ** E6 accepts the one-off image's own checksum when E1-L has not landed.
+  ** E6 renders probe-dependent commands just before they run, not in
+     preflight.
+  ** Draft U1 adds the insert operation that `deed-clause.sh` lacks.
 * *Departure from the brief:* new fixture `F-FEATURE-SKEW` (a real ext4
   feature that is newer than an older pinned e2fsprogs), so that M0 exercises
   W3's version comparison and not only the unknown-bit refusal. See E1.
