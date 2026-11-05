@@ -19,13 +19,23 @@ be read or written by the one writer. Example: the `docs-pillar` clause's
 `canonical-locations`. subsystem-warrior needs to register `docs/plan/`
 there (plan ruling P5) and cannot without a hand edit, which the deed forbids.
 
-*Proposal:* accept a selector `name[id]` in PATH that matches `:id "<id>"`,
-e.g. `ply/directory[docs-pillar]/canonical-locations`. Keep the existing
-first-match behaviour when no selector is given.
+*Proposal:* two changes, both needed:
 
-*Done when:* `deed-clause.sh set DEED ply/directory[docs-pillar]/canonical-locations plan '"plan/"'`
-works, the result re-reads with `deed-field.sh`, and `tests/workflows/deed_clause_test.sh`
-covers a selector hit, a selector miss (exit 1) and the old behaviour.
+. accept a selector `name[id]` in PATH that matches `:id "<id>"`, e.g.
+  `ply/directory[docs-pillar]/canonical-locations`, keeping the existing
+  first-match behaviour when no selector is given;
+. add an *insert* operation. Today `set` only replaces an existing
+  top-level scalar and exits 1 when the key is absent, and the
+  `docs-pillar` `canonical-locations` clause has no `:plan` key yet. Add,
+  for example, `deed-clause.sh add DEED PATH KEY VALUE`, which appends
+  `:KEY VALUE` to the clause, refuses (exit 1) if the key already exists so
+  it can never silently overwrite, and re-reads the result with
+  `deed-field.sh` like every other write.
+
+*Done when:* `deed-clause.sh add DEED ply/directory[docs-pillar]/canonical-locations plan '"plan/"'`
+works and the result re-reads with `deed-field.sh`. `tests/workflows/deed_clause_test.sh`
+must also cover: a selector hit, a selector miss (exit 1), the old
+behaviour, an insert of a new key, and a refused insert of an existing key.
 
 == U2 — `rsr-template-repo`: canon pin 2.1.2 → 2.1.3?
 

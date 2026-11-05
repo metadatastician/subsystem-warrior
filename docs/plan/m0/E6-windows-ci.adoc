@@ -84,11 +84,21 @@ causal evidence; an unattempted step without such evidence remains `not-run`.
 *A `no` counts only after the harness has proved its own inputs.* Before any
 capability step, the workflow verifies:
 
-* the fixture's sha256 against its E1 manifest;
+* the fixture's sha256: against its E1 manifest when E1-L has landed;
+  otherwise against the checksum that the Linux job producing the one-off
+  image emitted for it. Either way the receipt names the source of the
+  expected hash;
 * that the rootfs tarball's sha256 matches its pin;
 * that the cross-compiled executable exists and its hash matches the Linux
   job's artefact;
-* that every command line it will run has been rendered and logged.
+* that every *static* command template parses, with its placeholders
+  declared.
+
+Commands whose arguments come from a probe result are rendered and logged
+immediately before they run, not during preflight. The main case is
+`e2fsck -fn <device>`, whose device is known only after the before/after
+`lsblk` comparison. A dynamic command that cannot be rendered (for example,
+no new device was identified) is `incomplete: harness` and never `no`.
 
 If any of these fails, the result is `incomplete: harness`, which exits
 nonzero, and is never a `no`. Otherwise a missing or corrupt fixture, a
