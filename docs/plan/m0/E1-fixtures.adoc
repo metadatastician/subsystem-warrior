@@ -6,8 +6,9 @@
 [cols="1,4"]
 |===
 | Status | planned
-| Depends on | nothing (runs in parallel with E6)
-| Feeds | E2, E3, E4, E5 (host-side fixtures), M1 exit gate
+| Depends on | E1-L: nothing (runs in parallel with E6). E1-W: E6 (a Windows runner to build on)
+| Feeds | E1-L → E2, E3, E4; E1-W → E5; both → M1 exit gate
+| Parts | *E1-L*: every Linux-built fixture. *E1-W*: the Windows-only scenarios (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`), built and state-checked by E1's own scenario builder on E6's runner. E1 is green only when both parts are. Splitting it removes an E1↔E5 cycle: E5 never builds fixtures.
 | Rulings | P2 (qemu-img + Zig normaliser), P3 (Guix pin), P7 (dual-torn fixture)
 |===
 
@@ -55,7 +56,7 @@ Ids are `<layer>-<name>`. Layer letters: `R` registration, `C` container,
 | `qemu-img check` reports an error (to confirm)
 
 | `C-HOST-COMPRESSED`
-| Windows (E6)
+| Windows (E1-W, on E6's runner)
 | a clean `.vhdx` with the NTFS compression attribute set
 | `compact /q` reports compressed. WSL attach fails "Access is denied" (to confirm)
 
@@ -84,9 +85,10 @@ Ids are `<layer>-<name>`. Layer letters: `R` registration, `C` container,
   parses the file and finds the bad key
 
 | `R-ORPHAN-DISK`
-| Windows (E5/E6)
+| Windows (E1-W, on E6's runner)
 | a `.vhdx` on disk with no `Lxss` key referring to it. Shipped as a `.reg`
-  scenario plus disk path; the E5 harness, not the probe, creates it.
+  scenario plus disk path. E1's own Windows scenario builder creates and
+  verifies it (part E1-W, below); E5 only consumes it.
 | n/a on Linux; checked by E5
 |===
 
@@ -123,8 +125,18 @@ must come from e2fsprogs' release notes and be cited, not taken from memory.
   Record `guix describe` and every tool's `--version` in each manifest.
 . *Payload.* `payload.json` declares a deterministic tree, written into every
   ext4 image with `mke2fs -d` and fixed mtimes:
-  ** one directory with enough long-named entries to force an htree
-     (`dir_index`), because `F-HTREE` needs one;
+  ** one directory with many long-named entries, *explicitly indexed*,
+     because `F-HTREE` needs a real dx_root to damage. `mke2fs -d` alone
+     does not build an htree: `dir_index` only permits one. *Observed*
+     2026-11-04 (e2fsprogs 1.47.0): 500 entries via `mke2fs -d` left the
+     directory unindexed (flags `0x80000`; `debugfs htree` reported "Not a
+     hash-indexed directory"). Then `e2fsck -fyD` indexed it (flags `0x81000`),
+     and `e2fsck -fn` was clean. `e2fsck` stamps the real clock into
+     `s_wtime`/`s_lastcheck`, so run it with `E2FSCK_TIME` pinned as well as
+     `E2FSPROGS_FAKE_TIME`. With both pinned, two runs were byte-identical.
+     Before injecting `F-HTREE`, the generator asserts that the inode carries
+     the index flag and that `debugfs -R 'htree <dir>'` dumps a root node.
+     A fixture that fails this is not built;
   ** files of mixed sizes (inline, single-extent, multi-extent) with
      seeded-PRNG content;
   ** at least one sparse file with more than four separate data runs, so
