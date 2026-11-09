@@ -86,6 +86,91 @@ keep the template workflow.
 *Done when:* `just repo-init` (or its checklist) tells the owner to turn
 default setup off, and an estate sweep confirms no minted repo has both.
 
+== U6 — `standards`: a PROOF-POLICY §1 row for Zig (Atoma)
+
+*Where:* `metadatastician/standards`, `3-practice/PROOF-POLICY.adoc` §1.
+This needs an owner ruling (§7).
+
+*Problem:* §1 maps Rust, Ada, interfaces/ABIs and theory, but not Zig. The
+estate writes FFI, I/O and binary parsing in Zig (language policy), and
+Atoma (`hyperpolymath/atoma`) verifies a Zig subset with z3. Without a row,
+every Zig repo has to record a §4 exception per obligation, each giving
+its own reason Idris2 is not the right fit. §5 already decides the status
+of a direct SMT result: `PROVEN` needs an independently checked
+certificate or an explicitly trusted checking boundary documented in the
+record, and otherwise it is `ASSUMED`. That leaves each repo to decide for
+itself whether Atoma counts as such a boundary, while Atoma classes itself
+`INCOMPLETE (Warrant)`. In subsystem-warrior this applies to SW-4 and SW-5.
+
+*Proposal:* add a §1 row "Zig code → Atoma subset, z3", and state when an
+Atoma result may be `PROVEN`. For example: z3 proof certificates rechecked
+by an independent checker, or an explicitly documented trusted boundary
+(Atoma's `INCOMPLETE (Warrant)` class until its Idris2 face compiles).
+
+*Done when:* the row exists with a pinned commit, and subsystem-warrior's
+SW-4 and SW-5 cite it instead of §4.
+
+== U7 — `rsr-template-repo`: never-compiled proof stubs
+
+*Where:* `hyperpolymath/rsr-template-repo`, `verification/proofs/`.
+
+*Evidence:* six of the template's nine proof files are quarantined in their
+own MANIFESTs as "has never compiled":
+
+* Idris2: `Types.idr`, `ABI/Layout.idr`, `ABI/Platform.idr`,
+  `ABI/Pointers.idr`, `ABI/Compliance.idr`;
+* Lean: `ApiTypes.lean`.
+
+They still appear as mandatory rows ABI-1..5 and TP-1..2 in every minted
+repo's `PROOF-NEEDS.adoc`.
+
+Verified in subsystem-warrior on 2026-11-09:
+
+* Agda `Properties.agda` passes `check-proofs.sh agda`, under `--safe`,
+  with Agda 2.6.3 and stdlib 1.7.3 from Ubuntu. That is not the §2.1
+  canonical pin.
+* Coq `TypeSafety.v` passes with Coq 8.18.0.
+* Idris2 and Lean were not run: the provers could not be installed in the
+  session.
+* The gate fails closed when a prover is missing (rc 1), as designed.
+
+*Proposal:* repair the five Idris2 stubs and `ApiTypes.lean` in the
+template, or remove them from the template and from the mandatory rows. A
+minted repo should not inherit obligations whose files have never
+compiled.
+
+== U8 — `mathesis`: make Atoma-checked Zig visible to the census
+
+*Where:* `hyperpolymath/mathesis`, `scripts/census/`. File it after E3, once
+a real artefact exists.
+
+*Problem:* the census finds proof files by prover extension. Zig/Atoma is
+not among them, so SW-4 and SW-5 would be invisible even once they exist.
+Per the owner's ruling (proof-status first), subsystem-warrior records
+them in `docs/status/PROOF-NEEDS.adoc` and `PROOF-STATUS.adoc`, and the
+census should read them from there. That needs either an Atoma marker the
+census recognises, or the census reading proof-status files.
+
+== U9 — `rsr-template-repo`: block merge until review bots have reported
+
+*Where:* `hyperpolymath/rsr-template-repo`, a workflow plus the ruleset
+template (`.github/rulesets/base.json`).
+
+*Problem:* on subsystem-warrior, PRs #1, #3 and #4 all merged seconds after
+being marked ready, and Codex then posted valid findings on each one after
+the merge (5, 5 and 2 findings). Each round needed a follow-up PR.
+
+*Proposal:* a required status check that passes only once each configured
+review bot (Codex, CodeRabbit) has reviewed the current head commit, or a
+fixed time has passed with no review of that commit. Each new head commit
+starts a new interval, so an interval that ran out on an earlier commit
+never releases a later one. A bot that has not reviewed the head by the
+end of the interval is recorded as `not-run`, never as a pass. A review
+the bot reports as failed counts as `not-run` too. On subsystem-warrior
+#6, Codex's review failed because the account had hit its usage limit.
+Ship the check in the template so every repo gets it. Verify it both ways, per LANGUAGE-POLICY §3: it holds a PR
+without a review, and releases one that has one.
+
 == U5 — later (kept from the plan README)
 
 * `hyperpolymath/atoma`: offer the VHDX header parser as milestone S's second

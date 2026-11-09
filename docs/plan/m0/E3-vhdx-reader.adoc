@@ -117,6 +117,21 @@ Log *replay* (M1, container repair), writing VHDX, differencing disks, VHD
 
 == Aspects
 
+* *Proof record (standards PROOF-POLICY @ `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`).*
+  Obligation SW-4 in `docs/status/PROOF-NEEDS.adoc`, `OPEN` until this
+  card runs. The E3 PR records a §4 exception in two places: a header
+  comment in each `verified/` file, and a row in
+  `docs/status/PROOF-STATUS.adoc`. The record names the obligation and the
+  tool (Atoma, with z3). It also gives the reason the mapped prover
+  (Idris2) is not the right fit: the properties belong to the shipped Zig
+  code, and Idris2 could only prove them of a restated model, leaving the
+  correspondence to the code unchecked. The status follows the rule in
+  `PROOF-NEEDS.adoc`, which is `ASSUMED` unless the owner accepts a
+  documented trusted checking boundary (§5). The trust boundary lists the
+  Atoma commit and the z3 version. Atoma and z3 are
+  installed through the Guix manifest (§6), and the run asserts both
+  versions and fails on a mismatch. This is an engineering obligation:
+  Proof Witness Grades (§8.1) do not apply.
 * *Correctness claim:* "Atoma-checked, Warrant", never "proved" (brief
   §Atoma).
 * *Security:* the verified layer is the part that touches attacker-shaped
