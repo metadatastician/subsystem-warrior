@@ -96,10 +96,14 @@ capability step, the workflow verifies:
   image emitted for it. Either way the receipt names the source of the
   expected hash. A producer's own hash only shows that the file was not
   changed in transit, so the one-off image is accepted only if the same
-  Linux job also proved it is `X-CLEAN`: `qemu-img check` clean,
-  `e2fsck -fn` clean on its raw image, and its virtual size and filesystem
-  UUID recorded. The Windows job checks those recorded results along with
-  the hash. A one-off image without them is `incomplete: harness`;
+  Linux job also proved it is `X-CLEAN`. That means `qemu-img check` is
+  clean on the final VHDX, `e2fsck -fn` is clean on a raw image extracted
+  *from that final VHDX* with `qemu-img convert -O raw`, and the virtual
+  size and filesystem UUID are recorded. A check of the raw image made
+  before conversion does not count, because it does not cover the
+  filesystem that ships. The Windows job checks those recorded results
+  along with the hash. A one-off image without them is
+  `incomplete: harness`;
 * that the rootfs tarball's sha256 matches its pin;
 * that the cross-compiled executable exists and its hash matches the Linux
   job's artefact;

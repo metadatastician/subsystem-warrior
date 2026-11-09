@@ -22,7 +22,7 @@ This directory holds the plan for the WSL backend of subsystem-warrior. It is a
 | One task card per Milestone 0 experiment.
 
 | link:UPSTREAM-DRAFTS.adoc[UPSTREAM-DRAFTS.adoc]
-| Issue drafts for work that belongs in other repositories (U1–U5). None
+| Issue drafts for work that belongs in other repositories (U1–U9). None
   have been filed; filing is the owner's call.
 |===
 
@@ -106,18 +106,29 @@ the text and the repo's own scripts before any change.
   PROOF-POLICY at `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`:
   ** `docs/status/PROOF-NEEDS.adoc` lists the obligations SW-1 to SW-6,
      all `OPEN`.
-  ** The Atoma-checked Zig parsers (SW-4, SW-5) are §4 exceptions recorded
-     `ASSUMED`. U6 drafts the standards amendment that would give Zig a §1
-     row.
+  ** The Atoma-checked Zig parsers (SW-4, SW-5) are planned §4 exceptions.
+     Idris2 could only prove these properties of a restated model, not of
+     the shipped Zig code. They are `OPEN` now. E3 and E4 will record
+     `ASSUMED` unless the owner accepts Atoma as an explicitly trusted
+     checking boundary under §5, which is open again for the owner. U6
+     drafts the standards amendment that would give Zig a §1 row.
+  ** `docs/status/PROOF-STATUS.adoc` now counts all 13 obligations.
   ** Proof Witness Grades do not apply: every obligation is engineering.
-  ** Mathesis derives from this repo's proof-status files (proof-status
-     first). U8 covers the census's Zig/Atoma blind spot.
+  ** Proof-status first: the intended route is for Mathesis to read this
+     repo's proof-status files. That route is planned and depends on U8;
+     the current census would not show SW-4 or SW-5.
   ** The template's never-compiled stubs are fixed at source (U7).
   ** The late-review pattern is answered by a merge gate in the template
      (U9).
   ** Codex's two late findings on #4 are applied to E6: a failed mount is a
      capability `no`, and a one-off fixture must be shown `X-CLEAN` before
      its hash is trusted.
+  ** CodeRabbit's review of #6, checked against the pinned policy text:
+     the §5 trusted-boundary path is now stated; the §4 records give the
+     reason Idris2 is not the right fit; E4 states that it exercises the
+     W3 comparison; E6 runs `e2fsck` on a raw image extracted from the
+     final VHDX; and in U9 each new head commit restarts the review
+     interval.
 * Codex's review of `#3` again arrived after its merge. Its four distinct
   findings are applied in a second follow-up:
   ** The E1 catalogue now names E1-W as the builder of both Windows scenarios.

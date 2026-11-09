@@ -120,14 +120,19 @@ e2fsck in the rescue distro (M1).
 == Aspects
 
 * *Proof record (standards PROOF-POLICY @ `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`):*
-  obligation SW-5 in `docs/status/PROOF-NEEDS.adoc`, recorded exactly as
-  E3's SW-4. That means a §4 exception (Zig has no §1 verifier; Atoma with
-  z3), status `ASSUMED` (§5) with the Atoma and z3 versions as the trust
-  boundary, toolchain from Guix (§6), and no Proof Witness Grade (an
-  engineering obligation, §8.1). Termination of the bounded extent walk
-  rests on Atoma's `@decreases` check, so it is `ASSUMED` too, never
-  `PROVEN`. The W3 version comparison (SW-3) is a contract proved in Idris2
-  in M1. E4 only produces the feature table it reads.
+  obligation SW-5 in `docs/status/PROOF-NEEDS.adoc`, `OPEN` until this
+  card runs, and recorded exactly as E3's SW-4. It is a §4 exception for
+  the same reason: the properties belong to the shipped Zig code, which
+  Idris2 could only reach through a restated model. The tools are Atoma
+  and z3, with their versions as the trust boundary, installed from Guix
+  (§6). The status follows the rule in `PROOF-NEEDS.adoc` (§5). There is
+  no Proof Witness Grade, because this is an engineering obligation
+  (§8.1). Termination of the bounded extent walk rests on Atoma's
+  `@decreases` check, so it has the same status as the rest of SW-5.
+* *W3 (SW-3):* E4 produces the feature table, and it also *exercises* the
+  W3 version comparison: the `F-FEATURE-SKEW` mutation above requires the
+  probe to compare versions and report both outcomes. The comparison is
+  *proved* as a contract (SW-3) in Idris2 in M1.
 * *Safety (W3):* the feature table is the single source the M1 write gate
   reads. Keep it data (`src/errors/` or `src/definitions/`), not code.
 * *Privacy (W5):* the probe reports structure, names and hashes, never file

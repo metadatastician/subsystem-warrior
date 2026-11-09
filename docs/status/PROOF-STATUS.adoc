@@ -10,14 +10,14 @@
 |===
 | Category | Total | Done | In Progress | Blocked | Remaining
 
-| ABI/FFI (ABI) | 5 | 0 | 0 | 0 | 5
+| ABI/FFI (ABI) | 6 | 0 | 0 | 0 | 6
 | Typing (TP) | 2 | 0 | 0 | 0 | 2
-| Invariant (INV) | 0 | 0 | 0 | 0 | 0
+| Invariant (INV) | 3 | 0 | 0 | 0 | 3
 | Security (SEC) | 0 | 0 | 0 | 0 | 0
 | Concurrency (CONC) | 0 | 0 | 0 | 0 | 0
 | Algorithm (ALG) | 0 | 0 | 0 | 0 | 0
-| Domain (DOM) | 0 | 0 | 0 | 0 | 0
-| *Total* | *7* | *0* | *0* | *0* | *7*
+| Domain (DOM) | 2 | 0 | 0 | 0 | 2
+| *Total* | *13* | *0* | *0* | *0* | *13*
 |===
 
 *Overall*: 0% proven
@@ -66,7 +66,17 @@
 | ABI-5 | C ABI compliance | ABI | Idris2 | P1 | 4h
 | TP-1 | Core data type well-formedness | TP | Idris2 | P1 | 4h
 | TP-2 | Public API type safety | TP | Lean4 | P2 | 4h
+| SW-1 | W1: original disk never written | INV | Idris2 | P1 | — (M1)
+| SW-2 | W2: repair pipeline steps cannot be skipped | INV | Idris2 | P1 | — (M1)
+| SW-3 | W3: no write past the rescue tool's e2fsprogs version | INV | Idris2 | P1 | — (M1)
+| SW-4 | VHDX parsers: bounds, overflow, initialisation | DOM | Atoma (Zig), §4 exception | P1 | — (E3)
+| SW-5 | ext4 parsers: as SW-4, plus extent-walk termination | DOM | Atoma (Zig), §4 exception | P1 | — (E4)
+| SW-6 | Parser interface contracts | ABI | Idris2 | P2 | — (M1)
 |===
+
+SW-1 to SW-6 are defined in `PROOF-NEEDS.adoc`, which also records the §4
+exception for SW-4 and SW-5 and the status rule for their results. They
+have no effort estimate yet.
 
 == Verification Commands
 
@@ -98,4 +108,5 @@ panic-attack assail --proofs-only
 | Date | Change | By
 
 | 2026-04-04 | Initial proof status tracking | Template
+| 2026-11-09 | Added project obligations SW-1 to SW-6 (all open) | subsystem-warrior plan
 |===

@@ -70,13 +70,33 @@ These proofs come from the rsr-template-repo and MUST be present in every repo:
 
 Every row above is `OPEN` (PROOF-POLICY §5) until its experiment or
 milestone lands. The rules are standards PROOF-POLICY, pinned at
-`9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`. SW-4 and SW-5 are §4
-exceptions: Zig has no §1 verifier. Their best reachable status is
-`ASSUMED`, because Atoma's z3 answers are not certificate-checked, unless
-a standards amendment changes that (`docs/plan/UPSTREAM-DRAFTS.adoc` U6).
+`9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`.
+
+SW-4 and SW-5 are §4 exceptions. §1 maps engineering properties to Idris2,
+but these are properties of the shipped Zig parser code itself: in-bounds
+access, no overflow, no uninitialised reads, and loop termination. In
+Idris2 they could only be proved about a restated model, and the
+model-to-Zig correspondence would stay unchecked, like the Aeneas
+correspondence row in §4.1. §1 applies the same reasoning to Rust and Ada,
+whose code properties are verified on the code and not restated in Idris2.
+Atoma, with z3, checks the Zig source directly. SW-6, the interface
+contract that stands apart from the implementation, stays in Idris2.
+
+Status of an Atoma result under §5, which applies to a direct SMT result
+under §4: `PROVEN` needs either an independently checked certificate or an
+explicitly trusted checking boundary documented in the record. Without
+either, the result is `ASSUMED`. Atoma's z3 answers are not
+certificate-checked. Atoma currently classifies itself as
+`INCOMPLETE (Warrant)`. The owner's ruling of 2026-11-09 is to record
+`ASSUMED`. That ruling was made before the trusted-boundary path was
+noted, so it is open again for the owner. Until the owner rules again,
+E3 and E4 record `ASSUMED`.
+
 All six are engineering obligations, so Proof Witness Grades (§8) do not
-apply. Mathesis derives its catalogue entry from this file and the
-receipts. Nothing is entered in Mathesis by hand.
+apply. Nothing is entered in Mathesis by hand: the intended route is for
+Mathesis to read this file and the receipts. That route is planned, not
+working. The current census finds proofs by prover file extension, so it
+would not show SW-4 or SW-5 (`docs/plan/UPSTREAM-DRAFTS.adoc` U8).
 
 == Dangerous Patterns (BANNED)
 

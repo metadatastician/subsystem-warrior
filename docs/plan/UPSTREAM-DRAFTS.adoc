@@ -94,9 +94,13 @@ This needs an owner ruling (§7).
 *Problem:* §1 maps Rust, Ada, interfaces/ABIs and theory, but not Zig. The
 estate writes FFI, I/O and binary parsing in Zig (language policy), and
 Atoma (`hyperpolymath/atoma`) verifies a Zig subset with z3. Without a row,
-every Zig repo has to record a §4 exception per obligation. Because the z3
-answers carry no certificate, §5 also caps them at `ASSUMED`
-(subsystem-warrior SW-4 and SW-5).
+every Zig repo has to record a §4 exception per obligation, each giving
+its own reason Idris2 is not the right fit. §5 already decides the status
+of a direct SMT result: `PROVEN` needs an independently checked
+certificate or an explicitly trusted checking boundary documented in the
+record, and otherwise it is `ASSUMED`. That leaves each repo to decide for
+itself whether Atoma counts as such a boundary, while Atoma classes itself
+`INCOMPLETE (Warrant)`. In subsystem-warrior this applies to SW-4 and SW-5.
 
 *Proposal:* add a §1 row "Zig code → Atoma subset, z3", and state when an
 Atoma result may be `PROVEN`. For example: z3 proof certificates rechecked
@@ -158,9 +162,13 @@ the merge (5, 5 and 2 findings). Each round needed a follow-up PR.
 
 *Proposal:* a required status check that passes only once each configured
 review bot (Codex, CodeRabbit) has reviewed the current head commit, or a
-fixed time has passed after ready-for-review with no review produced,
-recorded as `not-run` and never as a pass. Ship it in the template so every
-repo gets it. Verify it both ways, per LANGUAGE-POLICY §3: it holds a PR
+fixed time has passed with no review of that commit. Each new head commit
+starts a new interval, so an interval that ran out on an earlier commit
+never releases a later one. A bot that has not reviewed the head by the
+end of the interval is recorded as `not-run`, never as a pass. A review
+the bot reports as failed counts as `not-run` too. On subsystem-warrior
+#6, Codex's review failed because the account had hit its usage limit.
+Ship the check in the template so every repo gets it. Verify it both ways, per LANGUAGE-POLICY §3: it holds a PR
 without a review, and releases one that has one.
 
 == U5 — later (kept from the plan README)
