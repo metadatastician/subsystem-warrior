@@ -58,8 +58,15 @@ falsifier.
      snapshots and selected device path; require exactly one matching device,
      never assume a name such as `/dev/sdc`;
   .. run `wsl -d <name> -- e2fsck -fn <verified-device>` only on that verified
-     device. If identification fails or is ambiguous, record `no` with the
-     evidence and do not run e2fsck on any device;
+     device. Two outcomes are kept apart:
+     *capability `no`*: `wsl --mount` returns an error, or no new block
+     device appears in the before/after difference. Record `no` for the
+     bare-mount step, with the exit status, the stderr and the `lsblk` diff
+     as evidence, and `no` for e2fsck, caused by the failed prerequisite.
+     *`incomplete: harness`*: one or more new devices appear but none, or
+     more than one, matches the expected size and filesystem UUID. That is a
+     fixture or identification fault, not a statement about the runner.
+     In either case e2fsck runs on no device;
   .. fallback probe: the same import with `--version 1`, to bound what *is*
      available.
 * The `.vhdx` for the mount steps is `X-CLEAN` from E1 if E1 has landed;
@@ -87,7 +94,12 @@ capability step, the workflow verifies:
 * the fixture's sha256: against its E1 manifest when E1-L has landed;
   otherwise against the checksum that the Linux job producing the one-off
   image emitted for it. Either way the receipt names the source of the
-  expected hash;
+  expected hash. A producer's own hash only shows that the file was not
+  changed in transit, so the one-off image is accepted only if the same
+  Linux job also proved it is `X-CLEAN`: `qemu-img check` clean,
+  `e2fsck -fn` clean on its raw image, and its virtual size and filesystem
+  UUID recorded. The Windows job checks those recorded results along with
+  the hash. A one-off image without them is `incomplete: harness`;
 * that the rootfs tarball's sha256 matches its pin;
 * that the cross-compiled executable exists and its hash matches the Linux
   job's artefact;
@@ -97,8 +109,11 @@ capability step, the workflow verifies:
 Commands whose arguments come from a probe result are rendered and logged
 immediately before they run, not during preflight. The main case is
 `e2fsck -fn <device>`, whose device is known only after the before/after
-`lsblk` comparison. A dynamic command that cannot be rendered (for example,
-no new device was identified) is `incomplete: harness` and never `no`.
+`lsblk` comparison. When the mount failed or no new device appeared, the
+dependent command is not rendered at all: that is the capability `no`
+described above, not a harness fault. A dynamic command whose inputs *were*
+produced but cannot be rendered (an ambiguous device match, or a template
+error) is `incomplete: harness` and never `no`.
 
 If any of these fails, the result is `incomplete: harness`, which exits
 nonzero, and is never a `no`. Otherwise a missing or corrupt fixture, a

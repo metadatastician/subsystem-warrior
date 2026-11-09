@@ -113,7 +113,14 @@ docs/plan/                     this plan (P1; deed registration pending, P5)
   I/O (brief §Atoma). Putting everything Atoma checks under `verified/` lets a
   gate say "every file here is in the subset" and lets `zig-vhdx` /
   `zig-ext4-ro` be lifted out later as whole directories. Parsers are described
-  as "Atoma-checked, Warrant", never "proved".
+  as "Atoma-checked, Warrant", never "proved". Under
+  standards PROOF-POLICY (pinned at
+  `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`), Zig has no mapped verifier
+  (§1). Atoma is therefore a §4 exception, and since its z3 answers are not
+  certificate-checked, each parser obligation is recorded `ASSUMED` (§5) in
+  `docs/status/PROOF-STATUS.adoc`, with the Atoma and z3 versions as its
+  trust boundary. These are engineering obligations, so Proof Witness
+  Grades (§8) do not apply to them.
 . *The fixture generator does not reuse the reader's code.* `tests/fixtures/wsl/gen`
   writes VHDX/ext4 structures, and `src/interface/ffi/src/verified` reads them.
   If they shared a CRC or struct module, a shared misreading of [MS-VHDX] would

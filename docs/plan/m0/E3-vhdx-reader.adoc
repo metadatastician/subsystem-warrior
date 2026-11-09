@@ -117,6 +117,17 @@ Log *replay* (M1, container repair), writing VHDX, differencing disks, VHD
 
 == Aspects
 
+* *Proof record (standards PROOF-POLICY @ `9bdf864cc7f2c8e24b4df84bf00d04158eee3ad5`).*
+  Obligation SW-4 in `docs/status/PROOF-NEEDS.adoc`. Zig has no mapped
+  verifier (§1), so the E3 PR records a §4 exception in two places: a header
+  comment in each `verified/` file, and a row in
+  `docs/status/PROOF-STATUS.adoc`. The record names the obligation, the tool
+  (Atoma, with z3) and the reason (no §1 verifier exists for Zig). Status is
+  `ASSUMED` (§5): Atoma's z3 answers are not certificate-checked. The trust
+  boundary lists the Atoma commit and the z3 version. Atoma and z3 are
+  installed through the Guix manifest (§6), and the run asserts both
+  versions and fails on a mismatch. This is an engineering obligation:
+  Proof Witness Grades (§8.1) do not apply.
 * *Correctness claim:* "Atoma-checked, Warrant", never "proved" (brief
   §Atoma).
 * *Security:* the verified layer is the part that touches attacker-shaped
