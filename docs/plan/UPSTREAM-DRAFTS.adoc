@@ -102,10 +102,14 @@ record, and otherwise it is `ASSUMED`. That leaves each repo to decide for
 itself whether Atoma counts as such a boundary, while Atoma classes itself
 `INCOMPLETE (Warrant)`. In subsystem-warrior this applies to SW-4 and SW-5.
 
-*Proposal:* add a §1 row "Zig code → Atoma subset, z3", and state when an
-Atoma result may be `PROVEN`. For example: z3 proof certificates rechecked
-by an independent checker, or an explicitly documented trusted boundary
-(Atoma's `INCOMPLETE (Warrant)` class until its Idris2 face compiles).
+*Proposal:* add a §1 row "Zig code → Atoma subset", and state when an
+Atoma result may be `PROVEN`. subsystem-warrior's ruling P9 proposes
+the stricter answer as the estate default: only when every verification
+condition's proof certificate is rechecked by an independent checker,
+named and versioned in the record. The trusted-boundary path would then
+not apply to Atoma, at least while Atoma classes itself
+`INCOMPLETE (Warrant)`. Evidence for the row comes from E3's certificate
+experiment.
 
 *Done when:* the row exists with a pinned commit, and subsystem-warrior's
 SW-4 and SW-5 cite it instead of §4.
@@ -174,7 +178,10 @@ without a review, and releases one that has one.
 == U5 — later (kept from the plan README)
 
 * `hyperpolymath/atoma`: offer the VHDX header parser as milestone S's second
-  worked example, after E3's receipt is green.
+  worked example, after E3's receipt is green. Include ruling P9's request:
+  export each verification condition and emit a proof certificate that an
+  independent checker can recheck. Attach E3's certificate experiment as
+  evidence.
 * Estate packages `zig-vhdx` and `zig-ext4-ro`, after E3 / E4.
 * `standards`: a shared pinned-fixture-toolchain recipe (P3), and whether
   `plan/` should be a canonical docs location estate-wide.
