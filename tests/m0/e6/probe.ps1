@@ -151,6 +151,7 @@ $Templates = [ordered]@{
   'import'  = @{ text = 'wsl --import {name} {dir} {tar} --version {ver}'; vars = @('name', 'dir', 'tar', 'ver') }
   'mount'   = @{ text = 'wsl --mount {vhdx} --vhd --bare'; vars = @('vhdx') }
   'lsblk'   = @{ text = 'wsl -d {name} -u root -- lsblk --json --bytes -o NAME,PATH,TYPE,SIZE,UUID'; vars = @('name') }
+  'blkid'   = @{ text = 'wsl -d {name} -u root -- blkid -p -o value -s UUID {device}'; vars = @('name', 'device') }
   'e2fsck'  = @{ text = 'wsl -d {name} -u root -- e2fsck -fn {device}'; vars = @('name', 'device') }
   'unmount' = @{ text = 'wsl --unmount {vhdx}'; vars = @('vhdx') }
 }
@@ -180,20 +181,33 @@ $ev = [ordered]@{
 }
 Set-Verdict 'virtualisation' ($(if ($cs.HypervisorPresent) { 'yes' } else { 'no' })) $ev
 
-# 2. Is WSL present?
+# 2. Is WSL present, and which kind? The inbox wsl.exe (as on windows-2022,
+# first run 2026-11-17) has no --version and no --install --no-distribution,
+# but runs WSL1 distros. So --version alone cannot decide presence: an inbox
+# wsl.exe that answers --status or prints its usage is present.
+$wslCmd = Get-Command 'wsl.exe' -ErrorAction SilentlyContinue
 $ver = Invoke-Native 'wsl.exe' @('--version')
 $status = Invoke-Native 'wsl.exe' @('--status')
-$present = ($ver.rc -eq 0) -and ($ver.output -match 'WSL')
-Set-Verdict 'wsl-present' ($(if ($present) { 'yes' } else { 'no' })) ([ordered]@{ version = $ver; status = $status })
+$storeWsl = ($ver.rc -eq 0) -and ($ver.output -match 'WSL version')
+$inboxWsl = (-not $storeWsl) -and $wslCmd -and (($status.rc -eq 0) -or ($ver.output -match 'Usage: wsl\.exe'))
+$present = $storeWsl -or $inboxWsl
+$kind = if ($storeWsl) { 'store' } elseif ($inboxWsl) { 'inbox' } else { 'absent' }
+Set-Verdict 'wsl-present' ($(if ($present) { 'yes' } else { 'no' })) ([ordered]@{ kind = $kind; wsl_exe = "$($wslCmd.Source)"; version = $ver; status = $status })
 
-# 3. Install WSL if absent. A required reboot is a `no` for hosted CI.
-if ($present) {
-  Set-Verdict 'wsl-install' 'yes' ([ordered]@{ note = 'already present; no install attempted'; version = $ver })
+# 3. Get a current WSL without a reboot. A required reboot is a `no` for
+# hosted CI. Absent: `wsl --install --no-distribution` (card E6). Inbox:
+# that option does not exist there, so use what its own usage text offers,
+# `wsl --update --web-download`, which installs the current WSL from the web
+# instead of the Store. Either way, success means `wsl --version` then works.
+if ($kind -eq 'store') {
+  Set-Verdict 'wsl-install' 'yes' ([ordered]@{ note = 'current WSL already present; no install attempted'; version = $ver })
 } else {
-  $inst = Invoke-Native 'wsl.exe' @('--install', '--no-distribution')
-  $reboot = $inst.output -match '(?i)restart|reboot'
-  $ok = ($inst.rc -eq 0) -and -not $reboot
-  Set-Verdict 'wsl-install' ($(if ($ok) { 'yes' } else { 'no' })) ([ordered]@{ install = $inst; reboot_required = $reboot })
+  $instArgs = if ($kind -eq 'inbox') { @('--update', '--web-download') } else { @('--install', '--no-distribution') }
+  $inst = Invoke-Native 'wsl.exe' $instArgs
+  $after = Invoke-Native 'wsl.exe' @('--version')
+  $reboot = ($inst.output -match '(?i)restart|reboot') -or ($after.output -match '(?i)restart|reboot')
+  $ok = ($after.rc -eq 0) -and ($after.output -match 'WSL version') -and -not $reboot
+  Set-Verdict 'wsl-install' ($(if ($ok) { 'yes' } else { 'no' })) ([ordered]@{ from = $kind; install = $inst; version_after = $after; reboot_required = $reboot })
 }
 
 # 4-5. Import the pinned rootfs as WSL2 and check the kernel.
@@ -242,6 +256,18 @@ if ($wsl2Works) {
   $after = Get-Devices
   $beforePaths = @($before.devices | ForEach-Object { $_.path })
   $new = @($after.devices | Where-Object { $beforePaths -notcontains $_.path })
+  # lsblk reads UUIDs from udev's database, and the imported rootfs runs no
+  # udev, so lsblk's UUID column is empty there (first run, windows-2025,
+  # 2026-11-17). `blkid -p` probes the device itself. Each new device's UUID
+  # is read that way, rendered per device just before it runs.
+  foreach ($n in $new) {
+    $cmd = $Templates['blkid'].text.Replace('{name}', $Distro2).Replace('{device}', $n.path)
+    Write-Host "E6 probe: rendered: $cmd"
+    $b = Invoke-Native 'wsl.exe' @('-d', $Distro2, '-u', 'root', '--', 'blkid', '-p', '-o', 'value', '-s', 'UUID', $n.path)
+    $n.uuid_lsblk = $n.uuid
+    $n.uuid = if ($b.rc -eq 0) { $b.output.Trim() } else { '' }
+    $n.blkid = $b
+  }
   $match = @($new | Where-Object { $_.size -eq "$($fixture.virtual_size)" -and $_.uuid -eq "$($fixture.fs_uuid)" })
   $ev = [ordered]@{
     mount = $mount; before = $before.devices; after = $after.devices; new_devices = $new

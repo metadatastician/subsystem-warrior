@@ -212,6 +212,17 @@ The E6 PR implements this card as follows. Departures are named.
   added with the repo's `scripts/merge-actions-lock.rs`, because
   `gh actions-lock` is not available in the session. `check-lock-sync.sh`
   passes.
+* *Inbox WSL (departure, after the first run).* `windows-2022` ships only the
+  inbox `wsl.exe`. It has no `--version` and no `--install
+  --no-distribution`, but it runs WSL1 distros. Presence is therefore judged
+  by `--version` *or* `--status` *or* the usage text. For inbox WSL, the
+  install step runs `wsl --update --web-download`, the option its own usage
+  text offers, and succeeds only if `wsl --version` works afterwards with no
+  reboot.
+* *Device UUID (after the first run).* In the imported rootfs, `lsblk`
+  returned an empty UUID, because it reads udev's database and no udev runs
+  there. The probe reads each new device's UUID with `blkid -p`, which
+  probes the device itself, and records both values.
 * *Mutations:* `workflow_dispatch` takes a `mutation` input (`bad-path`,
   `corrupt-fixture`, `drop-verdict`, `not-run`), which runs on
   `windows-2025` only. The receipt records each run's URL.
