@@ -71,6 +71,14 @@ Each card cites the ruling it depends on.
 | Left untouched: it is still the template's own journal and `just repo-init`
   replaces it at mint. The first experiment PR after mint seeds the new
   ROADMAP from this file.
+
+| P9 | Route to `PROVEN` for the Atoma-checked parsers (SW-4, SW-5)
+| Checked certificates: an independent checker rechecks each verification
+  condition's solver proof. The §5 trusted-boundary path is not used. Until
+  certificates exist, results are recorded `ASSUMED`. E3 runs a
+  certificate experiment; the emitting work belongs in Atoma (U5, U6).
+  This replaces the 2026-11-09 ruling, which was made before the
+  trusted-boundary path was noted.
 |===
 
 === Changes after review (2026-10-27)
@@ -109,9 +117,9 @@ the text and the repo's own scripts before any change.
   ** The Atoma-checked Zig parsers (SW-4, SW-5) are planned §4 exceptions.
      Idris2 could only prove these properties of a restated model, not of
      the shipped Zig code. They are `OPEN` now. E3 and E4 will record
-     `ASSUMED` unless the owner accepts Atoma as an explicitly trusted
-     checking boundary under §5, which is open again for the owner. U6
-     drafts the standards amendment that would give Zig a §1 row.
+     `ASSUMED`, and the route to `PROVEN` is checked certificates
+     (ruling P9). U6 drafts the standards amendment that would give Zig a
+     §1 row.
   ** `docs/status/PROOF-STATUS.adoc` now counts all 13 obligations.
   ** Proof Witness Grades do not apply: every obligation is engineering.
   ** Proof-status first: the intended route is for Mathesis to read this
