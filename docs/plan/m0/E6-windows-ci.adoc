@@ -5,10 +5,10 @@
 
 [cols="1,4"]
 |===
-| Status | planned
+| Status | in progress: workflow and harness in the E6 PR; receipt after the first run
 | Depends on | nothing (runs first, in parallel with E1)
 | Feeds | where E5 and the Windows-only fixtures run; M1 test bed; owner's cross-compilation question
-| Rulings | P4 (runs first)
+| Rulings | P4 (runs first), P10 (stock runners, not the Guix pin)
 |===
 
 == Goal
@@ -173,6 +173,52 @@ runner lacks the capability" without any valid probe having run.
 * *Cost:* Windows minutes bill at a multiple of Linux minutes. Keep the
   matrix to two images and dispatch-only after the first answer.
 * *Honesty:* both "yes" and "no" are green outcomes. Only "unknown" is red.
+
+== As built
+
+The E6 PR implements this card as follows. Departures are named.
+
+* *Files:* `.github/workflows/m0-windows-probe.yml`, and under
+  `tests/m0/e6/`: `one-off-fixture.sh`, `fetch-rootfs.sh`,
+  `zig-smoke.sh` (with `zig-smoke/hello.zig`), `probe.ps1`, `judge.sh` and
+  `judge_test.sh`.
+* *Three jobs.* `inputs` (Linux) builds and checks the inputs. `probe` runs
+  on `windows-2022` and `windows-2025` and records verdicts. `judge` (Linux)
+  applies the acceptance rule. The completeness rule lives in the judge, a
+  shell script, so `judge_test.sh` can test it offline. The test covers the
+  card's dropped-verdict and `not-run` mutations, a harness fault, a verdict
+  without evidence, invalid JSON, no results, and the probe's step list
+  matching the judge's.
+* *Toolchain (ruling P10; departure from P3).* E6 runs on stock runners:
+  Ubuntu's `qemu-utils` and `e2fsprogs` packages, Zig 0.15.2 from
+  ziglang.org checked against its published sha256, and the Ubuntu Base
+  24.04.5 rootfs checked against Ubuntu's `SHA256SUMS`. Every version is
+  recorded in the inputs and the receipt. The Guix-pinned toolchain arrives
+  with the toolshed (U10).
+* *Rootfs:* Ubuntu Base 24.04.5 amd64. It ships `e2fsck` (e2fsprogs 1.47.0)
+  and `lsblk`, so nothing is installed inside WSL. It is gunzipped to a
+  plain `.tar` on Linux, so the probe does not depend on whether
+  `wsl --import` accepts gzip.
+* *One-off fixture:* a 64 MiB ext4 image in a dynamic VHDX (block size
+  1 MiB). The Linux job proves it `X-CLEAN` on the final VHDX: `qemu-img
+  check` clean, `e2fsck -fn` clean on a raw image extracted from the
+  VHDX, and the size and UUID read back. Its filesystem UUID is an ADR-008
+  profile C id in the domain `subsystem-warrior-fixture`, which is not
+  registered yet (U11).
+* *Actions:* the Windows job runs PowerShell only. It also uses the pinned
+  first-party `actions/checkout`, `actions/upload-artifact` and
+  `actions/download-artifact` already in `actions.lock`. The artifact
+  actions are needed to pass the inputs between jobs. The lock entry was
+  added with the repo's `scripts/merge-actions-lock.rs`, because
+  `gh actions-lock` is not available in the session. `check-lock-sync.sh`
+  passes.
+* *Mutations:* `workflow_dispatch` takes a `mutation` input (`bad-path`,
+  `corrupt-fixture`, `drop-verdict`, `not-run`), which runs on
+  `windows-2025` only. The receipt records each run's URL.
+* *Not tested locally:* `probe.ps1` and the Zig build run only in CI. This
+  session has no PowerShell, and running a downloaded Zig binary was
+  refused here. The `inputs` job parses `probe.ps1` with PowerShell's own
+  parser before any Windows minutes are spent.
 
 == Beyond this repo
 

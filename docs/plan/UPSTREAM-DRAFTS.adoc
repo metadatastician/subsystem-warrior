@@ -175,6 +175,59 @@ the bot reports as failed counts as `not-run` too. On subsystem-warrior
 Ship the check in the template so every repo gets it. Verify it both ways, per LANGUAGE-POLICY §3: it holds a PR
 without a review, and releases one that has one.
 
+== U10 — `bofj-kitt`: a toolshed of Guix-pinned toolchain images
+
+*Where:* `hyperpolymath/bofj-kitt` (owner ruling P11, 2026-11-17).
+subsystem-warrior's E1-L waits for this (ruling P10).
+
+*Problem:* every estate repo that needs a pinned toolchain pays for it
+separately. Running `guix time-machine` cold takes tens of minutes and several
+GB, in each session and each CI job. A cloud agent session may also refuse to
+run a downloaded binary, and did so in subsystem-warrior on 2026-11-17 for
+Zig. bofj-kitt's `tools/environments/environments.kyaml` already defines
+environment classes that install from an `image` (`ci-runner`,
+`devcontainer`, `sealed-container`) and allows `ghcr.io` for estate images.
+No image exists yet.
+
+*Proposal:*
+
+. Each toolshed image is built from a Guix pin, e.g. `guix time-machine -C
+  channels.scm -- pack -f docker -m manifest.scm`. The image *is* the pin,
+  so it meets PROOF-POLICY §6 (a container) and keeps P3-style rulings
+  intact.
+. CI rebuilds an image when its pin or manifest changes, publishes it by
+  digest, and records the digest, the Guix commit and every tool's
+  `--version` beside it. Nothing is referenced by tag.
+. Consumers reference the digest. bofj-kitt's environment manifest projects
+  it onto its `image` classes, and `provers.sh doctor` reports drift.
+. The first image is subsystem-warrior's fixture toolchain: e2fsprogs, qemu
+  (`qemu-img`), rhash and Zig at the `build/channels.scm` pin. It would also
+  carry a second, older e2fsprogs from an older channel, as E1's
+  `F-FEATURE-SKEW` oracle.
+
+*Done when:* the image is published by digest, with a rebuild workflow, and
+subsystem-warrior's E1-L runs inside it both locally and in CI.
+
+== U11 — `standards`: register the ADR-008 domain `subsystem-warrior-fixture`
+
+*Where:* `metadatastician/standards`,
+`docs/decisions/ADR-008-profile-c-domains.json`.
+
+*Problem:* subsystem-warrior mints deterministic UUIDs for its test fixtures
+(filesystem UUIDs, hash seeds, and the VHDX GUIDs E1's normaliser rewrites).
+ADR-008 profile C requires a *registered* domain, and none exists for this
+repo. E6 already uses `subsystem-warrior-fixture` for its one-off image, with
+the gap recorded in its inputs.
+
+*Proposal:* register `{domain: "subsystem-warrior-fixture", name: "the
+fixture id, optionally followed by \"/\" and the field it fills (e.g.
+X-CLEAN/hash_seed)", purpose: "deterministic ids inside M0 test fixtures",
+repos: ["metadatastician/subsystem-warrior"]}`, and run
+`scripts/check-uuid-v8-domains.sh` on the result.
+
+*Done when:* the domain is in the register, and subsystem-warrior's gates
+check against a pinned standards commit that includes it.
+
 == U5 — later (kept from the plan README)
 
 * `hyperpolymath/atoma`: offer the VHDX header parser as milestone S's second

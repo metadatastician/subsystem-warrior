@@ -22,7 +22,7 @@ This directory holds the plan for the WSL backend of subsystem-warrior. It is a
 | One task card per Milestone 0 experiment.
 
 | link:UPSTREAM-DRAFTS.adoc[UPSTREAM-DRAFTS.adoc]
-| Issue drafts for work that belongs in other repositories (U1–U9). None
+| Issue drafts for work that belongs in other repositories (U1–U11). None
   have been filed; filing is the owner's call.
 |===
 
@@ -81,6 +81,24 @@ Each card cites the ruling it depends on.
   certificate experiment; the emitting work belongs in Atoma (U5, U6).
   This replaces the 2026-11-09 ruling, which was made before the
   trusted-boundary path was noted.
+
+| P10 | Toolchain for E6 and E1-L (2026-11-17)
+| E1-L waits for the estate toolshed: Guix-pinned toolchain images, kept
+  current by CI and published by digest (U10). E6 does not wait. It runs
+  on stock GitHub runners with distro packages and sha256-pinned downloads,
+  and records every version. *Departure from P3* for E6 only.
+
+| P11 | Where the toolshed lives (2026-11-17)
+| `hyperpolymath/bofj-kitt`, the estate's environment layer. Its
+  `environments.kyaml` already has `image` classes and allows `ghcr.io` for
+  estate images. Beyond this repo: drafted as U10, not filed.
+
+| P12 | How E1-L is split into PRs (2026-11-17)
+| A base PR first: toolchain, payload, ext4 determinism, normaliser,
+  `X-CLEAN`, and the diff that finds every random field. Then one PR per
+  fault layer: `C-*`, `F-*`, `K-*`. The fixtures follow the product's
+  layers, so each layer PR unblocks its consumer (E3 or E4) as soon as it
+  lands.
 |===
 
 === Changes after review (2026-10-27)
@@ -163,7 +181,8 @@ the text and the repo's own scripts before any change.
 
 * E6 is a cheap, independent probe. Its answer decides where the Windows-only
   fixtures (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`) are built and where E5 runs,
-  so it runs first, in parallel with E1-L.
+  so it runs first. E1-L was planned to run in parallel, but by ruling P10
+  it now waits for the toolshed's first Guix-pinned image (U10).
 * E1 has two parts. E1-L builds the Linux fixtures. E1-W is E1's own Windows
   scenario builder, which runs on E6's runner. E5 only *consumes* E1-W's
   scenarios, so no fixture depends on the probe that tests it (a Codex review
