@@ -91,8 +91,12 @@ certificate-checked, and Atoma currently classifies itself as
 
 Owner ruling (plan ruling P9): the route to `PROVEN` for SW-4 and SW-5 is
 certificates. Each verification condition's solver proof is rechecked by
-an independent checker, so neither the solver nor Atoma remains in the
-trusted base. This project does not use the trusted-boundary path. Until
+an independent checker, so the solver leaves the trusted base. Atoma's
+translation of Zig source into verification conditions stays in the
+trusted base unless a separate check covers it, and the record names it in
+the trust boundary. This is the same position §5 takes for Creusot through
+Why3, whose condition generator is also trusted. This project does not use
+the trusted-boundary path. Until
 checked certificates exist, E3 and E4 record their Atoma results as
 `ASSUMED`, as §5 requires. The certificate toolchain is not chosen yet.
 z3's own proof output may not be stable enough to check independently, so

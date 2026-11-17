@@ -74,7 +74,9 @@ Each card cites the ruling it depends on.
 
 | P9 | Route to `PROVEN` for the Atoma-checked parsers (SW-4, SW-5)
 | Checked certificates: an independent checker rechecks each verification
-  condition's solver proof. The §5 trusted-boundary path is not used. Until
+  condition's solver proof, which takes the solver out of the trusted base.
+  Atoma's Zig-to-condition translation stays trusted and is named in the
+  record. The §5 trusted-boundary path is not used. Until
   certificates exist, results are recorded `ASSUMED`. E3 runs a
   certificate experiment; the emitting work belongs in Atoma (U5, U6).
   This replaces the 2026-11-09 ruling, which was made before the
