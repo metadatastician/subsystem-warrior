@@ -257,7 +257,6 @@ your own repo - but do not read their emptiness as neglect here.
 | `verification/fuzzing/`
 | `verification/safety_case/`
 | `verification/simulations/`
-| `verification/tests/`
 | `verification/traceability/`
 |===
 
