@@ -32,8 +32,10 @@ on:
 permissions:
   contents: read
 
+# One group per ref and mutation, so the four mutation runs can be
+# dispatched together without cancelling each other.
 concurrency:
-  group: m0-e6-${{ github.ref }}
+  group: m0-e6-${{ github.ref }}-${{ inputs.mutation || 'probe' }}
   cancel-in-progress: true
 
 jobs:
