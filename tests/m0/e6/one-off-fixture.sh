@@ -125,3 +125,4 @@ node -e '
   }));' | node "$repo/scripts/ijson-jcs-cli.js" canon > "$out/fixture.json"
 
 echo "one-off-fixture: $fixture_id proven X-CLEAN: sha256 $vhdx_sha, size $virtual_size, uuid $fs_uuid"
+echo "one-off-fixture: tools: $mke2fs_v; $qemu_v"

@@ -103,9 +103,20 @@ Runner images: `win22` 20261112.366.7 and `win25-vs2026` 20261103.298.1.
 * *Rootfs:* Ubuntu Base 24.04.5 amd64, sha256
   `e77b6f10c2590cef872b33ee9f635a0e3fd1f57fb074c0e52b5c7f56147a0c86`
   (Ubuntu's `SHA256SUMS`).
-* *Tools:* Ubuntu 24.04's `qemu-utils` and `e2fsprogs` (1.47.0); Zig 0.15.2,
-  sha256 `02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239`.
-  These are stock-runner tools, not the Guix pin (ruling P10).
+* *Tools:* these are stock-runner tools, not the Guix pin (ruling P10).
+  ** `qemu-utils` `1:8.2.2+ds-0ubuntu1.18`, from Ubuntu 24.04, as shown in
+     the
+     https://github.com/metadatastician/subsystem-warrior/actions/runs/44207444327/job/134476926465[inputs job]'s
+     apt log. It provided `qemu-img convert` and `qemu-img check`.
+  ** `e2fsprogs` on the Linux runner (`mke2fs`, and `e2fsck -fn` on the
+     extracted raw image) came preinstalled, so this run's log does not show
+     its version. The inputs manifest recorded it, but this receipt did not
+     copy it. The `e2fsck` 1.47.0 in the table above is the rootfs's copy,
+     which checked the device inside WSL.
+  ** Zig 0.15.2, sha256
+     `02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239`.
+  ** Later runs record every version: since the review fix, the probe copies
+     the input manifests into its results.
 
 == Consequences
 

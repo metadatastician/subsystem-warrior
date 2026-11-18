@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
-# probe.ps1 — E6, Windows CI feasibility (docs/plan/m0/E6-windows-ci.adoc).
+# probe.ps1 - E6, Windows CI feasibility (docs/plan/m0/E6-windows-ci.adoc).
 #
 # Records one verdict per required step, `yes` or `no`, each with evidence,
 # into a results file. It never decides on its own that E6 passed: the judge
@@ -25,6 +25,7 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
+. (Join-Path $PSScriptRoot 'probe-lib.ps1')
 $env:WSL_UTF8 = '1'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 
@@ -47,6 +48,7 @@ $R = [ordered]@{
     runner_os     = "$env:RUNNER_OS"
   }
   mutation   = $Mutation
+  inputs     = $null
   harness    = [ordered]@{ status = 'ok'; checks = @() }
   steps      = [ordered]@{}
 }
@@ -88,11 +90,16 @@ function Get-Sha256([string]$Path) {
 }
 
 # ---------------------------------------------------------------- preflight
+# Read-Manifest throws on a missing, unreadable, empty or incomplete manifest,
+# so none of those can be recorded as a successful parse. The manifests carry
+# the producing job's tool versions (P10); they are copied into the results so
+# the judge's receipt keeps that provenance.
 $fixture = $null; $rootfs = $null; $zig = $null
 try {
-  $fixture = Get-Content -Raw -LiteralPath (Join-Path $InputsDir 'fixture.json') | ConvertFrom-Json
-  $rootfs = Get-Content -Raw -LiteralPath (Join-Path $InputsDir 'rootfs.json') | ConvertFrom-Json
-  $zig = Get-Content -Raw -LiteralPath (Join-Path $InputsDir 'zig.json') | ConvertFrom-Json
+  $fixture = Read-Manifest $InputsDir 'fixture.json'
+  $rootfs = Read-Manifest $InputsDir 'rootfs.json'
+  $zig = Read-Manifest $InputsDir 'zig.json'
+  $R.inputs = [ordered]@{ fixture = $fixture; rootfs = $rootfs; zig = $zig }
   Add-Check 'input manifests parse' $true 'fixture.json, rootfs.json, zig.json'
 } catch {
   Add-Check 'input manifests parse' $false (Limit "$_")
@@ -229,22 +236,11 @@ if ($imported2) {
 }
 
 # 6. Bare-mount the fixture and identify it by the before/after difference.
+# A failed lsblk is reported as ok = false, never as "no devices".
 function Get-Devices {
   $r = Invoke-Native 'wsl.exe' @('-d', $Distro2, '-u', 'root', '--', 'lsblk', '--json', '--bytes', '-o', 'NAME,PATH,TYPE,SIZE,UUID')
-  $devs = @()
-  if ($r.rc -eq 0) {
-    try {
-      $j = $r.output | ConvertFrom-Json
-      $stack = [Collections.Generic.Stack[object]]::new()
-      foreach ($d in $j.blockdevices) { $stack.Push($d) }
-      while ($stack.Count -gt 0) {
-        $d = $stack.Pop()
-        $devs += [ordered]@{ path = "$($d.path)"; type = "$($d.type)"; size = "$($d.size)"; uuid = "$($d.uuid)" }
-        foreach ($c in @($d.children)) { if ($c) { $stack.Push($c) } }
-      }
-    } catch { }
-  }
-  return [ordered]@{ raw = $r; devices = $devs }
+  $o = ConvertFrom-Lsblk $r
+  return [ordered]@{ ok = $o.ok; error = $o.error; raw = $r; devices = $o.devices }
 }
 
 $device = $null
@@ -271,22 +267,21 @@ if ($wsl2Works) {
   $match = @($new | Where-Object { $_.size -eq "$($fixture.virtual_size)" -and $_.uuid -eq "$($fixture.fs_uuid)" })
   $ev = [ordered]@{
     mount = $mount; before = $before.devices; after = $after.devices; new_devices = $new
+    observation = [ordered]@{ before_ok = $before.ok; before_error = $before.error; after_ok = $after.ok; after_error = $after.error }
     expected = [ordered]@{ size = "$($fixture.virtual_size)"; uuid = "$($fixture.fs_uuid)" }
   }
+  if (-not ($before.ok -and $after.ok)) { $ev.lsblk_raw = [ordered]@{ before = $before.raw; after = $after.raw } }
   $mountFailed = ($mount.rc -ne 0) -or ($mount.output -match '(?i)error|failed|denied')
-  if ($mountFailed -or $new.Count -eq 0) {
-    $ev.reading = 'capability no: the mount returned an error or no new block device appeared'
-    Set-Verdict 'bare-mount' 'no' $ev
-  } elseif ($match.Count -eq 1) {
+  $d = Resolve-BareMount $mountFailed $before.ok $after.ok $new.Count $match.Count
+  $ev.reading = $d.reading
+  if ($d.fault) {
+    $harnessFault = $d.fault
+    Add-Check 'device identification' $false $harnessFault
+  } elseif ($d.verdict -eq 'yes') {
     $device = $match[0].path
     $ev.selected_device = $device
-    Set-Verdict 'bare-mount' 'yes' $ev
-  } else {
-    $harnessFault = "$($match.Count) of $($new.Count) new devices match the expected size and UUID"
-    $ev.reading = "incomplete: harness: $harnessFault"
-    Add-Check 'device identification' $false $harnessFault
-    Set-Verdict 'bare-mount' 'not-run: harness ambiguous device match' $ev
   }
+  Set-Verdict 'bare-mount' $d.verdict $ev
 } else {
   Set-Verdict 'bare-mount' 'no' ([ordered]@{ cause = 'prerequisite run-v2 is no: no WSL2 distro to see a block device' })
 }
@@ -298,7 +293,7 @@ if ($device) {
   $fsck = Invoke-Native 'wsl.exe' @('-d', $Distro2, '-u', 'root', '--', 'e2fsck', '-fn', $device)
   Set-Verdict 'e2fsck' ($(if ($fsck.rc -eq 0) { 'yes' } else { 'no' })) ([ordered]@{ rendered = $cmd; e2fsck = $fsck })
 } elseif ($harnessFault) {
-  Set-Verdict 'e2fsck' 'not-run: harness ambiguous device match' ([ordered]@{ reason = $harnessFault })
+  Set-Verdict 'e2fsck' 'not-run: harness device fault' ([ordered]@{ reason = $harnessFault })
 } else {
   Set-Verdict 'e2fsck' 'no' ([ordered]@{ cause = 'prerequisite bare-mount is no: no verified device, so the command was not rendered' })
 }

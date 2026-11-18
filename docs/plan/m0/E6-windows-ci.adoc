@@ -117,7 +117,10 @@ immediately before they run, not during preflight. The main case is
 dependent command is not rendered at all: that is the capability `no`
 described above, not a harness fault. A dynamic command whose inputs *were*
 produced but cannot be rendered (an ambiguous device match, or a template
-error) is `incomplete: harness` and never `no`.
+error) is `incomplete: harness` and never `no`. So is a device observation
+that failed: an `lsblk` that exits nonzero or prints output that does not
+parse has observed nothing, not zero new devices. A mount that itself
+reports failure stays `no`.
 
 If any of these fails, the result is `incomplete: harness`, which exits
 nonzero, and is never a `no`. Otherwise a missing or corrupt fixture, a
@@ -180,21 +183,32 @@ The E6 PR implements this card as follows. Departures are named.
 
 * *Files:* `.github/workflows/m0-windows-probe.yml`, and under
   `tests/m0/e6/`: `one-off-fixture.sh`, `fetch-rootfs.sh`,
-  `zig-smoke.sh` (with `zig-smoke/hello.zig`), `probe.ps1`, `judge.sh` and
-  `judge_test.sh`.
+  `zig-smoke.sh` (with `zig-smoke/hello.zig`), `probe.ps1`, `probe-lib.ps1`,
+  `probe_test.ps1`, `judge.sh` and `judge_test.sh`.
 * *Three jobs.* `inputs` (Linux) builds and checks the inputs. `probe` runs
   on `windows-2022` and `windows-2025` and records verdicts. `judge` (Linux)
-  applies the acceptance rule. The completeness rule lives in the judge, a
-  shell script, so `judge_test.sh` can test it offline. The test covers the
-  card's dropped-verdict and `not-run` mutations, a harness fault, a verdict
-  without evidence, invalid JSON, no results, and the probe's step list
-  matching the judge's.
+  applies the acceptance rule. The `inputs` job decides the list of runner
+  images once; the probe matrix and the judge both read it, and the judge
+  requires a results file from exactly those images. The completeness rule
+  lives in the judge, a shell script, so `judge_test.sh` can test it
+  offline. The test covers the card's dropped-verdict and `not-run`
+  mutations, a harness fault, a verdict without evidence, invalid JSON, no
+  results, an image that did not report, an image that was not expected, no
+  image list, and the probe's step list matching the judge's.
+* *Probe decisions (after review, 2026-11-18).* The probe's pure decisions
+  live in `probe-lib.ps1`: reading an input manifest, reading an `lsblk`
+  observation, and deciding `bare-mount`. `probe_test.ps1` tests them, and
+  runs `probe.ps1`'s preflight end to end with broken inputs, on Linux in
+  the `inputs` job.
 * *Toolchain (ruling P10; departure from P3).* E6 runs on stock runners:
   Ubuntu's `qemu-utils` and `e2fsprogs` packages, Zig 0.15.2 from
   ziglang.org checked against its published sha256, and the Ubuntu Base
-  24.04.5 rootfs checked against Ubuntu's `SHA256SUMS`. Every version is
-  recorded in the inputs and the receipt. The Guix-pinned toolchain arrives
-  with the toolshed (U10).
+  24.04.5 rootfs checked against Ubuntu's `SHA256SUMS`. The input manifests
+  record every version. The first receipt carried only some of them: it
+  records `qemu-utils` from the job's apt log, but not the runner's
+  preinstalled `e2fsprogs`. Since the review fix, the probe copies the
+  manifests into its results, so later receipts carry every version. The
+  Guix-pinned toolchain arrives with the toolshed (U10).
 * *Rootfs:* Ubuntu Base 24.04.5 amd64. It ships `e2fsck` (e2fsprogs 1.47.0)
   and `lsblk`, so nothing is installed inside WSL. It is gunzipped to a
   plain `.tar` on Linux, so the probe does not depend on whether
@@ -226,10 +240,11 @@ The E6 PR implements this card as follows. Departures are named.
 * *Mutations:* `workflow_dispatch` takes a `mutation` input (`bad-path`,
   `corrupt-fixture`, `drop-verdict`, `not-run`), which runs on
   `windows-2025` only. The receipt records each run's URL.
-* *Not tested locally:* `probe.ps1` and the Zig build run only in CI. This
-  session has no PowerShell, and running a downloaded Zig binary was
-  refused here. The `inputs` job parses `probe.ps1` with PowerShell's own
-  parser before any Windows minutes are spent.
+* *Not tested locally:* `probe.ps1`, `probe_test.ps1` and the Zig build run
+  only in CI. Installing PowerShell and running a downloaded Zig binary were
+  both refused in this session. Before any Windows minutes are spent, the
+  `inputs` job parses the three PowerShell files with PowerShell's own
+  parser and runs `probe_test.ps1`.
 
 == Beyond this repo
 

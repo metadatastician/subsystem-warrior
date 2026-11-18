@@ -4,16 +4,20 @@
 #
 # judge.sh — decide E6 from the probe's results files.
 #
-# The workflow exits 0 iff every results file (one per runner image):
+# The workflow exits 0 iff there is exactly one results file per expected
+# runner image, and every one of them:
 #   * is valid I-JSON;
 #   * reports harness status `ok`;
 #   * has every required step, each with verdict `yes` or `no` and non-empty
 #     evidence.
-# A missing step, a `not-run: <reason>` verdict, a harness fault or no results
-# at all make E6 incomplete (exit 1). `no` is a valid, successful answer.
+# A missing image, an unexpected image, a missing step, a `not-run: <reason>`
+# verdict, a harness fault or no results at all make E6 incomplete (exit 1).
+# `no` is a valid, successful answer.
 #
-# Usage: judge.sh RESULTS_DIR [RECEIPT_JSON]
-# Reads RESULTS_DIR/*/results.json (one directory per matrix leg). Writes the
+# Usage: E6_EXPECTED_LEGS="windows-2022 windows-2025" judge.sh RESULTS_DIR [RECEIPT_JSON]
+# Reads RESULTS_DIR/<image>/results.json. E6_EXPECTED_LEGS is required: the
+# workflow passes the same image list it gave the probe matrix, so a leg that
+# died before uploading is caught rather than silently absent. Writes the
 # combined verdicts, canonical JCS, to RECEIPT_JSON when given.
 # Exit: 0 = complete; 1 = incomplete; 2 = setup error.
 set -euo pipefail
@@ -21,7 +25,12 @@ set -euo pipefail
 dir="${1:-}"
 receipt="${2:-}"
 if [ -z "$dir" ] || [ ! -d "$dir" ]; then
-  echo "judge: usage: judge.sh RESULTS_DIR [RECEIPT_JSON]" >&2
+  echo "judge: usage: E6_EXPECTED_LEGS=\"IMAGE...\" judge.sh RESULTS_DIR [RECEIPT_JSON]" >&2
+  exit 2
+fi
+read -r -a expected <<<"${E6_EXPECTED_LEGS:-}"
+if [ "${#expected[@]}" -eq 0 ]; then
+  echo "judge: setup error: E6_EXPECTED_LEGS names no runner image" >&2
   exit 2
 fi
 command -v node >/dev/null || { echo "judge: missing tool: node" >&2; exit 2; }
@@ -41,6 +50,21 @@ fi
 
 legs=()
 status=0
+# Every expected image must have reported, and nothing else may have.
+for want in "${expected[@]}"; do
+  if [ ! -f "$dir/$want/results.json" ]; then
+    echo "judge: $want: incomplete: no results file (the leg did not report)" >&2
+    status=1
+  fi
+done
+for f in "${files[@]}"; do
+  leg="$(basename "$(dirname "$f")")"
+  case " ${expected[*]} " in
+    *" $leg "*) ;;
+    *) echo "judge: $leg: incomplete: results from an image this run did not expect" >&2; status=1 ;;
+  esac
+done
+
 for f in "${files[@]}"; do
   leg="$(basename "$(dirname "$f")")"
   if ! c="$(node "$canon" canon < "$f")"; then
@@ -92,4 +116,4 @@ if [ "$status" -ne 0 ]; then
   echo "judge: E6 incomplete" >&2
   exit 1
 fi
-echo "judge: E6 complete: every required step on ${#legs[@]} runner image(s) has a yes/no verdict with evidence"
+echo "judge: E6 complete: every required step on ${#legs[@]} runner image(s) (${legs[*]}) has a yes/no verdict with evidence"
