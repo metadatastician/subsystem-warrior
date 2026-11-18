@@ -52,6 +52,14 @@ try {
   Check 'ConvertFrom-Lsblk: unparseable output is not ok' (-not $garbage.ok)
   $noArray = ConvertFrom-Lsblk ([ordered]@{ rc = 0; output = '{}' })
   Check 'ConvertFrom-Lsblk: output without blockdevices is not ok' (-not $noArray.ok)
+  $objNotArray = ConvertFrom-Lsblk ([ordered]@{ rc = 0; output = '{"blockdevices":{}}' })
+  Check 'ConvertFrom-Lsblk: blockdevices that is an object, not an array, is not ok' (-not $objNotArray.ok)
+  $noPath = ConvertFrom-Lsblk ([ordered]@{ rc = 0; output = '{"blockdevices":[{"name":"sda","type":"disk","size":1}]}' })
+  Check 'ConvertFrom-Lsblk: a device without a path is not ok' (-not $noPath.ok)
+  $badChildren = ConvertFrom-Lsblk ([ordered]@{ rc = 0; output = '{"blockdevices":[{"name":"sda","path":"/dev/sda","type":"disk","size":1,"children":{}}]}' })
+  Check 'ConvertFrom-Lsblk: children that is an object, not an array, is not ok' (-not $badChildren.ok)
+  $one = ConvertFrom-Lsblk ([ordered]@{ rc = 0; output = '{"blockdevices":[{"name":"sda","path":"/dev/sda","type":"disk","size":1}]}' })
+  Check 'ConvertFrom-Lsblk: a one-device array is ok' ($one.ok -and (@($one.devices).Count -eq 1))
   $tree = '{"blockdevices":[{"name":"sda","path":"/dev/sda","type":"disk","size":100,"uuid":null,"children":[{"name":"sda1","path":"/dev/sda1","type":"part","size":90,"uuid":"u1"}]},{"name":"sde","path":"/dev/sde","type":"disk","size":67108864,"uuid":null}]}'
   $good = ConvertFrom-Lsblk ([ordered]@{ rc = 0; output = $tree })
   Check 'ConvertFrom-Lsblk: a valid tree is ok' $good.ok

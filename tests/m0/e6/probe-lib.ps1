@@ -19,8 +19,9 @@ function Read-Manifest([string]$Dir, [string]$Name) {
 }
 
 # Turn one `lsblk --json` observation into a device list. `ok` is false when
-# lsblk failed or its output did not parse: an observation that failed is not
-# an observation of zero devices.
+# lsblk failed or its output does not have lsblk's shape (`blockdevices` an
+# array, every device with a path, `children` an array when present): an
+# observation that failed is not an observation of zero devices.
 function ConvertFrom-Lsblk($Raw) {
   $devs = @()
   if ($Raw.rc -ne 0) {
@@ -29,10 +30,13 @@ function ConvertFrom-Lsblk($Raw) {
   try {
     $j = $Raw.output | ConvertFrom-Json -ErrorAction Stop
     if ($null -eq $j -or $null -eq $j.blockdevices) { throw 'no blockdevices array' }
+    if ($j.blockdevices -isnot [array]) { throw 'blockdevices is not an array' }
     $stack = [Collections.Generic.Stack[object]]::new()
     foreach ($d in $j.blockdevices) { $stack.Push($d) }
     while ($stack.Count -gt 0) {
       $d = $stack.Pop()
+      if (-not "$($d.path)") { throw 'a device has no path' }
+      if ($null -ne $d.children -and $d.children -isnot [array]) { throw "children of $($d.path) is not an array" }
       $devs += [ordered]@{ path = "$($d.path)"; type = "$($d.type)"; size = "$($d.size)"; uuid = "$($d.uuid)" }
       foreach ($c in @($d.children)) { if ($c) { $stack.Push($c) } }
     }
