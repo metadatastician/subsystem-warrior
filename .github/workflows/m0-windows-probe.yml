@@ -1,0 +1,208 @@
+# SPDX-License-Identifier: MPL-2.0
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# M0 experiment E6: can GitHub-hosted Windows runners run WSL2, bare-mount a
+# VHDX into it and e2fsck the disk? (docs/plan/m0/E6-windows-ci.adoc)
+#
+#   inputs  (Linux)    builds a one-off X-CLEAN VHDX and proves it clean,
+#                      fetches the pinned rootfs, cross-compiles the Zig
+#                      smoke executable.
+#   probe   (Windows)  records a yes/no verdict with evidence per step.
+#   judge   (Linux)    passes only if every expected image reported and every
+#                      required step on it has a yes/no verdict. `no` is a
+#                      valid answer; a missing image or verdict, `not-run` or
+#                      a harness fault is red.
+#
+# The image list is decided once, in the inputs job, and both the probe matrix
+# and the judge read it from there.
+#
+# Windows minutes cost more than Linux minutes: pull requests run only when
+# this experiment's own files change, and a mutation run uses one image.
+name: M0 E6 Windows probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      mutation:
+        description: "Card E6 mutation to run (none = the real probe)"
+        type: choice
+        options: [none, bad-path, corrupt-fixture, drop-verdict, not-run]
+        default: none
+  pull_request:
+    paths:
+      - ".github/workflows/m0-windows-probe.yml"
+      - "tests/m0/e6/**"
+
+permissions:
+  contents: read
+
+# One group per ref and mutation, so the four mutation runs can be
+# dispatched together without cancelling each other.
+concurrency:
+  group: m0-e6-${{ github.ref }}-${{ inputs.mutation || 'probe' }}
+  cancel-in-progress: true
+
+jobs:
+  inputs:
+    name: E6 inputs (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      legs: ${{ steps.legs.outputs.legs }}
+    steps:
+      - name: Decide the runner images
+        id: legs
+        env:
+          EVENT: ${{ github.event_name }}
+          MUTATION: ${{ inputs.mutation || 'none' }}
+        run: |
+          set -euo pipefail
+          # A mutation run uses one image; the real probe uses both.
+          if [ "$EVENT" = workflow_dispatch ] && [ "$MUTATION" != none ]; then
+            legs='["windows-2025"]'
+          else
+            legs='["windows-2022","windows-2025"]'
+          fi
+          echo "legs=$legs" >> "$GITHUB_OUTPUT"
+          echo "runner images: $legs"
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Judge self-test, probe parse check and probe self-test
+        run: |
+          set -euo pipefail
+          bash tests/m0/e6/judge_test.sh
+          pwsh -NoProfile -Command '
+            $bad = 0
+            foreach ($f in "probe.ps1", "probe-lib.ps1", "probe_test.ps1") {
+              $errs = $null
+              [System.Management.Automation.Language.Parser]::ParseFile("tests/m0/e6/$f", [ref]$null, [ref]$errs) | Out-Null
+              if ($errs.Count -gt 0) { $errs | ForEach-Object { Write-Host "::error::$($f): $_" }; $bad++ } else { Write-Host "$f parses" }
+            }
+            exit $bad'
+          pwsh -NoProfile -File tests/m0/e6/probe_test.ps1
+
+      - name: Install qemu-utils and e2fsprogs
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-utils e2fsprogs
+
+      - name: Install Zig 0.15.2 (sha256-pinned)
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+            https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz \
+            --output "$RUNNER_TEMP/zig.tar.xz"
+          echo "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239  $RUNNER_TEMP/zig.tar.xz" | sha256sum --check --strict
+          tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
+
+      - name: Build and verify the inputs
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/e6-inputs"
+          bash tests/m0/e6/one-off-fixture.sh "$out"
+          bash tests/m0/e6/fetch-rootfs.sh "$out"
+          ZIG="$RUNNER_TEMP/zig-x86_64-linux-0.15.2/zig" bash tests/m0/e6/zig-smoke.sh "$out"
+          ls -l "$out"
+
+      - name: Upload the inputs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e6-inputs
+          path: ${{ runner.temp }}/e6-inputs
+          if-no-files-found: error
+          retention-days: 7
+
+  probe:
+    name: E6 probe (${{ matrix.os }})
+    needs: inputs
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.inputs.outputs.legs) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the inputs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: e6-inputs
+          path: ${{ runner.temp }}/e6-inputs
+
+      - name: Probe
+        shell: pwsh
+        env:
+          MUTATION: ${{ inputs.mutation || 'none' }}
+          LEG: ${{ matrix.os }}
+        run: |
+          $leg = Join-Path $env:RUNNER_TEMP "e6-results\$env:LEG"
+          New-Item -ItemType Directory -Force -Path $leg | Out-Null
+          ./tests/m0/e6/probe.ps1 -InputsDir (Join-Path $env:RUNNER_TEMP 'e6-inputs') `
+            -OutFile (Join-Path $leg 'results.json') -Mutation $env:MUTATION
+          exit $LASTEXITCODE
+
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e6-results-${{ matrix.os }}
+          path: ${{ runner.temp }}/e6-results
+          if-no-files-found: warn
+          retention-days: 30
+
+  judge:
+    name: E6 judge
+    needs: [inputs, probe]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the results
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: e6-results-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/e6-results
+
+      - name: Judge
+        env:
+          # Empty if the inputs job never decided; the judge then exits 2.
+          E6_EXPECTED_LEGS: ${{ join(fromJSON(needs.inputs.outputs.legs || '[]'), ' ') }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/e6-results"
+          rc=0
+          bash tests/m0/e6/judge.sh "$RUNNER_TEMP/e6-results" "$RUNNER_TEMP/e6-receipt.json" | tee "$RUNNER_TEMP/verdicts.tsv" || rc=$?
+          {
+            echo "## E6 verdicts"
+            echo ""
+            echo "| image | step | verdict |"
+            echo "|---|---|---|"
+            awk -F'\t' 'NF==3 { printf "| %s | %s | %s |\n", $1, $2, $3 }' "$RUNNER_TEMP/verdicts.tsv"
+            echo ""
+            if [ "$rc" -eq 0 ]; then echo "E6 complete."; else echo "E6 incomplete (see the job log)."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
+      - name: Upload the receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e6-receipt
+          path: ${{ runner.temp }}/e6-receipt.json
+          if-no-files-found: warn
+          retention-days: 90

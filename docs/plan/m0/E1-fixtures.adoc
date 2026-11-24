@@ -5,11 +5,11 @@
 
 [cols="1,4"]
 |===
-| Status | planned
-| Depends on | E1-L: nothing (runs in parallel with E6). E1-W: E6 (a Windows runner to build on)
+| Status | waiting: E1-L starts when the toolshed publishes its first image (P10). PR cut: P12
+| Depends on | E1-L: the toolshed's first pinned image (P10, U10). E1-W: E6 (a Windows runner to build on)
 | Feeds | E1-L → E2, E3, E4; E1-W → E5; both → M1 exit gate
 | Parts | *E1-L*: every Linux-built fixture. *E1-W*: the Windows-only scenarios (`C-HOST-COMPRESSED`, `R-ORPHAN-DISK`), built and state-checked by E1's own scenario builder on E6's runner. E1 is green only when both parts are. Splitting it removes an E1↔E5 cycle: E5 never builds fixtures.
-| Rulings | P2 (qemu-img + Zig normaliser), P3 (Guix pin), P7 (dual-torn fixture)
+| Rulings | P2 (qemu-img + Zig normaliser), P3 (Guix pin), P7 (dual-torn fixture), P10 (toolshed), P12 (base, then per layer)
 |===
 
 == Goal
