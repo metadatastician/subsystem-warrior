@@ -21,7 +21,7 @@
     # ──────────────────────────────────────────────────────────────────────
     # Primary application service
     # ──────────────────────────────────────────────────────────────────────
-    "subsystem-warrior": {
+    subsystem-warrior: {
       build: {
         context: "..",
         dockerfile: "build/container/Containerfile",
@@ -74,7 +74,7 @@
         "rokur-audit:/var/log/rokur",
       ],
       depends_on: {
-        "subsystem-warrior": {
+        subsystem-warrior: {
           condition: "service_healthy",
         },
       },
@@ -128,7 +128,7 @@
     },
   },
   volumes: {
-    "subsystem-warrior-data": null,
+    subsystem-warrior-data: null,
     rokur-audit: null,
   },
 }
