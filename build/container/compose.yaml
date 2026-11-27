@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 #
-# {{PROJECT_NAME}} — portable compose stack (Tier B)
+# subsystem-warrior — portable compose stack (Tier B)
 #
 # This is the runtime-agnostic, OCI compose-spec file. It works unchanged with:
 #   podman compose  -f build/container/compose.yaml up -d
@@ -21,12 +21,12 @@
     # ──────────────────────────────────────────────────────────────────────
     # Primary application service
     # ──────────────────────────────────────────────────────────────────────
-    "{{SERVICE_NAME}}": {
+    "subsystem-warrior": {
       build: {
         context: "..",
         dockerfile: "build/container/Containerfile",
       },
-      image: "{{REGISTRY}}/{{SERVICE_NAME}}:latest",
+      image: "{{REGISTRY}}/subsystem-warrior:latest",
       ports: [
         "{{PORT}}:{{PORT}}",
       ],
@@ -37,7 +37,7 @@
         APP_DATA_DIR: "/data",
       },
       volumes: [
-        "{{SERVICE_NAME}}-data:/data",
+        "subsystem-warrior-data:/data",
       ],
       restart: "unless-stopped",
       healthcheck: {
@@ -61,7 +61,7 @@
     rokur: {
       image: "ghcr.io/hyperpolymath/rokur:latest",
       environment: {
-        ROKUR_BACKEND: "http://{{SERVICE_NAME}}:{{PORT}}",
+        ROKUR_BACKEND: "http://subsystem-warrior:{{PORT}}",
         ROKUR_LISTEN: "[::]:8081",
         ROKUR_REQUIRED_SECRETS: "", # comma-separated env names that MUST be set
         ROKUR_AUDIT_LOG: "/var/log/rokur/audit.jsonl",
@@ -74,7 +74,7 @@
         "rokur-audit:/var/log/rokur",
       ],
       depends_on: {
-        "{{SERVICE_NAME}}": {
+        "subsystem-warrior": {
           condition: "service_healthy",
         },
       },
@@ -128,7 +128,7 @@
     },
   },
   volumes: {
-    "{{SERVICE_NAME}}-data": null,
+    "subsystem-warrior-data": null,
     rokur-audit: null,
   },
 }
