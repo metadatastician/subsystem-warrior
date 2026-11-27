@@ -16,9 +16,9 @@
 ; field; scripts/deed-clause.sh is the one writer.
 (repo-deed
   :schema-version "1.0.0"
-  :canonical-name "rsr-template-repo"
+  :canonical-name "subsystem-warrior"
   :beholding-chora #u5"estate/chora"
-  :repo-uuid #u5"github.com/hyperpolymath/rsr-template-repo"
+  :repo-uuid #u5"github.com/metadatastician/subsystem-warrior"
   ; The canon pin: which release of hyperpolymath/standards canon.lock this
   ; repo implements. It is the ONLY canon pin in this deed (deed_canon
   ; refuses zero or two); the (rsr-profile) clause below declares
@@ -168,7 +168,7 @@
     (methodology :instructions-clause "bot-directives" :default-mode hybrid))
   (manifest
     :version "0.1.0"
-    :last-updated "{{CURRENT_DATE}}"
+    :last-updated "2026-11-27"
     :project "[YOUR-REPO-NAME]"
     :purpose "Canonical RSR (Rhodium Standard Repository) template — governance, CI/CD, machine-readable metadata, ABI/FFI seam and formal-verification scaffolding that hyperpolymath projects are instantiated from."
     (agent :name CLAUDE :role "proofs, compilers, repo-local implementation, CI/CD, formal verification, Rust/Idris2/Zig")
@@ -307,7 +307,7 @@
   ; and the golden path. The CLAUDE.md arrival pack reads anchor/golden-path and hashes this clause (ANCHOR@…).
   (anchor
     :schema "hyperpolymath.anchor/1"
-    :repo "{{OWNER}}/{{REPO}}"
+    :repo "metadatastician/subsystem-warrior"
     :authority "upstream-canonical"
     :purpose (
       "Define canonical semantics and policy boundaries for this repository."
@@ -316,12 +316,12 @@
       )
     (metadata
       :version "1.0.0"
-      :last-updated "{{CURRENT_DATE}}")
+      :last-updated "2026-11-27")
     (identity
-      :project "{{PROJECT_NAME}}"
+      :project "subsystem-warrior"
       ; language | library | service | tool
       :kind "{{PROJECT_KIND}}"
-      :one-sentence "{{PROJECT_PURPOSE}}"
+      :one-sentence "Subsystem Warrior is a recovery, configuration, issues, and risk management (upstream component for upcoming WSL-daimyo, WSA-daimyo, and other subsystem support)"
       :domain "{{PROJECT_DOMAIN}}")
     (semantic-authority
       :policy "canonical"
@@ -477,7 +477,7 @@
     (methodology
       (metadata
         :version "1.0.0"
-        :last-updated "{{CURRENT_DATE}}"
+        :last-updated "2026-11-27"
         :spec "https://github.com/hyperpolymath/standards/blob/main/1-formats/a2ml/agentic/docs/ADR-002-methodology-layer.adoc")
       ; ============================================================================
       ; MODE SELECTION
@@ -560,7 +560,7 @@
         ; These rules detect corrupt/template/stale state files.
         (state-validation
           ; A regex, not a literal list. The list form named the exact strings it was
-          ; meant to catch ("{{PROJECT}}"), so `just repo-init` substituted the detector along
+          ; meant to catch ("SUBSYSTEM_WARRIOR"), so `just repo-init` substituted the detector along
           ; with everything else and shipped reject-if-contains = ["MY_PROJECT", ...] —
           ; a guard against unfilled tokens that had been eaten by the filling. The
           ; escaped pattern below contains no token for init to match, and covers every
@@ -579,7 +579,7 @@
     (coverage
       (metadata
         :version "1.0.0"
-        :last-updated "{{CURRENT_DATE}}")
+        :last-updated "2026-11-27")
       ; ============================================================================
       ; COVERAGE STATE
       ; ============================================================================
@@ -597,7 +597,7 @@
     (debt
       (metadata
         :version "1.0.0"
-        :last-updated "{{CURRENT_DATE}}"))
+        :last-updated "2026-11-27"))
     ; rra — directives for Robot Repo Automaton (RRA) enforcing the Platonic Ideal root.
     (rra
       :target "robot-repo-automaton"
@@ -710,8 +710,8 @@
     ; See: https://github.com/hyperpolymath/standards/tree/main/groove-protocol
     (groove
       :version "1.0"
-      ; Service identity — replace {{REPO}} with your project name
-      :service "{{REPO}}"
+      ; Service identity — replace subsystem-warrior with your project name
+      :service "subsystem-warrior"
       :service-version "0.1.0"
       ; Primary port — MUST be unique across the ecosystem. Check PORT-REGISTRY.md
       ; in the standards repo before assigning:
@@ -740,7 +740,7 @@
     (maintenance-axes
       (metadata
         :version "1.0.0"
-        :last-updated "{{CURRENT_DATE}}"
+        :last-updated "2026-11-27"
         :scope "repo")
       (discovery
         :human-entrypoints (

@@ -14,7 +14,7 @@ earlier duplicates at `.github/MAINTAINERS` and `docs/attribution/MAINTAINERS.ad
 
 | {{AUTHOR}}
 | Lead Maintainer
-| https://github.com/{{OWNER}}[@{{OWNER}}]
+| https://github.com/metadatastician[@metadatastician]
 |===
 
 == Responsibilities
