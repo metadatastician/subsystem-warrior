@@ -18,7 +18,7 @@
   :schema-version "1.0.0"
   :canonical-name "subsystem-warrior"
   :beholding-chora #u5"estate/chora"
-  :repo-uuid #uuid"249d441f-a832-8109-9046-ddde785920f3"
+  :repo-uuid #u5"github.com/metadatastician/subsystem-warrior"
   ; The canon pin: which release of hyperpolymath/standards canon.lock this
   ; repo implements. It is the ONLY canon pin in this deed (deed_canon
   ; refuses zero or two); the (rsr-profile) clause below declares
